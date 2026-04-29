@@ -1,6 +1,6 @@
 package com.bankie.bankie_api.security;
 
-import com.bankie.bankie_api.model.User;
+import com.bankie.bankie_api.entity.User;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;

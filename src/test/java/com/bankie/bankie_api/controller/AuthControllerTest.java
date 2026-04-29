@@ -5,7 +5,7 @@ import com.bankie.bankie_api.dto.request.RegisterRequest;
 import com.bankie.bankie_api.dto.response.LoginResponse;
 import com.bankie.bankie_api.dto.response.UserSummary;
 import com.bankie.bankie_api.exception.EmailAlreadyExistsException;
-import com.bankie.bankie_api.model.enums.Role;
+import com.bankie.bankie_api.enums.Role;
 import com.bankie.bankie_api.security.JwtService;
 import com.bankie.bankie_api.service.AuthService;
 import tools.jackson.databind.ObjectMapper;

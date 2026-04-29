@@ -1,6 +1,6 @@
 package com.bankie.bankie_api.repository;
 
-import com.bankie.bankie_api.model.User;
+import com.bankie.bankie_api.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;

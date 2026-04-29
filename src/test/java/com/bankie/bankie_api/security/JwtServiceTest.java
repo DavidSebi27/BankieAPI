@@ -1,7 +1,7 @@
 package com.bankie.bankie_api.security;
 
-import com.bankie.bankie_api.model.User;
-import com.bankie.bankie_api.model.enums.Role;
+import com.bankie.bankie_api.entity.User;
+import com.bankie.bankie_api.enums.Role;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import org.junit.jupiter.api.Test;

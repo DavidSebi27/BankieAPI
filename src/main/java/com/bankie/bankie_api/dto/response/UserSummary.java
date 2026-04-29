@@ -1,7 +1,7 @@
 package com.bankie.bankie_api.dto.response;
 
-import com.bankie.bankie_api.model.User;
-import com.bankie.bankie_api.model.enums.Role;
+import com.bankie.bankie_api.entity.User;
+import com.bankie.bankie_api.enums.Role;
 
 public record UserSummary(
         Long id,
