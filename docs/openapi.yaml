@@ -1,0 +1,991 @@
+openapi: 3.0.3
+info:
+  title: Bankie API
+  description: >
+    REST API for the Inholland Code Generation banking application.
+    Supports customer registration, employee account management,
+    fund transfers, ATM operations, and transaction history.
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:8080
+    description: Local development
+  - url: https://your-app.onrender.com
+    description: Production (Render)
+
+tags:
+  - name: Auth
+    description: Login and registration
+  - name: Users
+    description: User management (employee only)
+  - name: Accounts
+    description: Bank account operations
+  - name: Transactions
+    description: Transfers and transaction history
+  - name: ATM
+    description: ATM deposit and withdrawal
+
+# ─────────────────────────────────────────────
+# SECURITY
+# ─────────────────────────────────────────────
+security:
+  - bearerAuth: []
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  # ─────────────────────────────────────────────
+  # SCHEMAS
+  # ─────────────────────────────────────────────
+  schemas:
+
+    # --- Auth ---
+    RegisterRequest:
+      type: object
+      required: [firstName, lastName, email, password, bsn, phoneNumber]
+      properties:
+        firstName:
+          type: string
+          example: Giga
+        lastName:
+          type: string
+          example: Chad
+        email:
+          type: string
+          format: email
+          example: gigachad@gigabank.nl
+        password:
+          type: string
+          format: password
+          minLength: 8
+          example: ILoveMoney123!
+        bsn:
+          type: string
+          pattern: '^\d{8,9}$'
+          example: "069420666"
+        phoneNumber:
+          type: string
+          example: "+31612345678"
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          example: gigachad@gigabank.nl
+        password:
+          type: string
+          format: password
+          example: ILoveMoney123!
+
+    LoginResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJnaWdhY2hhZEBnaWdhYmFuay5ubCJ9.s3cr3t
+        role:
+          $ref: '#/components/schemas/Role'
+
+    # --- User ---
+    Role:
+      type: string
+      enum: [CUSTOMER, EMPLOYEE]
+
+    AccountStatus:
+      type: string
+      enum: [PENDING, ACTIVE, CLOSED]
+
+    UserSummary:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 1
+        firstName:
+          type: string
+          example: Giga
+        lastName:
+          type: string
+          example: Chad
+        email:
+          type: string
+          example: gigachad@gigabank.nl
+        phoneNumber:
+          type: string
+          example: "+31612345678"
+        bsn:
+          type: string
+          example: "069420666"
+        role:
+          $ref: '#/components/schemas/Role'
+        approved:
+          type: boolean
+          example: false
+
+    # --- Account ---
+    AccountType:
+      type: string
+      enum: [CHECKING, SAVINGS]
+
+    Account:
+      type: object
+      properties:
+        iban:
+          type: string
+          example: NL69INHO0420666999
+        type:
+          $ref: '#/components/schemas/AccountType'
+        balance:
+          type: number
+          format: double
+          example: 9999999.99
+        currency:
+          type: string
+          enum: [EUR]
+          example: EUR
+        status:
+          $ref: '#/components/schemas/AccountStatus'
+        absoluteLimit:
+          type: number
+          format: double
+          description: Balance may never go below this value
+          example: -50.00
+        dailyTransferLimit:
+          type: number
+          format: double
+          description: Max total outgoing transfers per day
+          example: 10000.00
+        ownerId:
+          type: integer
+          format: int64
+          example: 1
+
+    AccountDetails:
+      type: object
+      description: Full account view including owner info
+      properties:
+        account:
+          $ref: '#/components/schemas/Account'
+        owner:
+          $ref: '#/components/schemas/UserSummary'
+
+    CreateAccountsRequest:
+      type: object
+      description: Used by employee when approving a customer signup
+      required: [absoluteLimit, dailyTransferLimit]
+      properties:
+        absoluteLimit:
+          type: number
+          format: double
+          example: -50.00
+        dailyTransferLimit:
+          type: number
+          format: double
+          example: 10000.00
+
+    UpdateLimitsRequest:
+      type: object
+      properties:
+        absoluteLimit:
+          type: number
+          format: double
+          example: -50.00
+        dailyTransferLimit:
+          type: number
+          format: double
+          example: 500.00
+
+    IbanSearchResult:
+      type: object
+      properties:
+        firstName:
+          type: string
+          example: Broke
+        lastName:
+          type: string
+          example: Boy
+        iban:
+          type: string
+          example: NL42INHO0000000001
+
+    # --- Transactions ---
+    TransactionType:
+      type: string
+      enum: [TRANSFER, DEPOSIT, WITHDRAWAL]
+
+    Transaction:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 1337
+        type:
+          $ref: '#/components/schemas/TransactionType'
+        fromIban:
+          type: string
+          nullable: true
+          example: NL69INHO0420666999
+        toIban:
+          type: string
+          nullable: true
+          example: NL42INHO0000000001
+        amount:
+          type: number
+          format: double
+          example: 4.20
+        currency:
+          type: string
+          enum: [EUR]
+          example: EUR
+        timestamp:
+          type: string
+          format: date-time
+          example: "2025-04-16T04:20:00Z"
+        initiatedBy:
+          type: integer
+          format: int64
+          description: User ID of the person who initiated the transaction
+          example: 1
+
+    TransferRequest:
+      type: object
+      required: [fromIban, toIban, amount]
+      properties:
+        fromIban:
+          type: string
+          example: NL69INHO0420666999
+        toIban:
+          type: string
+          example: NL42INHO0000000001
+        amount:
+          type: number
+          format: double
+          minimum: 0.01
+          example: 4.20
+
+    # --- ATM ---
+    AtmRequest:
+      type: object
+      required: [iban, amount]
+      properties:
+        iban:
+          type: string
+          example: NL69INHO0420666999
+        amount:
+          type: number
+          format: double
+          minimum: 0.01
+          example: 500.00
+
+    # --- Pagination ---
+    PagedTransactions:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/Transaction'
+        page:
+          type: integer
+          example: 0
+        size:
+          type: integer
+          example: 20
+        totalElements:
+          type: integer
+          format: int64
+          example: 1337
+        totalPages:
+          type: integer
+          example: 67
+
+    PagedAccounts:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/Account'
+        page:
+          type: integer
+          example: 0
+        size:
+          type: integer
+          example: 20
+        totalElements:
+          type: integer
+          format: int64
+          example: 69
+        totalPages:
+          type: integer
+          example: 4
+
+    PagedUsers:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserSummary'
+        page:
+          type: integer
+          example: 0
+        size:
+          type: integer
+          example: 20
+        totalElements:
+          type: integer
+          format: int64
+          example: 3
+        totalPages:
+          type: integer
+          example: 1
+
+    # --- Errors ---
+    ErrorResponse:
+      type: object
+      properties:
+        status:
+          type: integer
+          example: 418
+        message:
+          type: string
+          example: "You are broke. Absolutely cooked."
+        timestamp:
+          type: string
+          format: date-time
+
+  # ─────────────────────────────────────────────
+  # REUSABLE RESPONSES
+  # ─────────────────────────────────────────────
+  responses:
+    Unauthorized:
+      description: Missing or invalid JWT — who are you?
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            status: 401
+            message: "No token, no money. Get out."
+            timestamp: "2025-04-16T04:20:00Z"
+    Forbidden:
+      description: Authenticated but insufficient role — you don't have clearance
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            status: 403
+            message: "Employees only, sir. Step away from the vault."
+            timestamp: "2025-04-16T04:20:00Z"
+    NotFound:
+      description: Resource not found — it ghosted you
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            status: 404
+            message: "Account not found. Did you make it up?"
+            timestamp: "2025-04-16T04:20:00Z"
+    BadRequest:
+      description: Validation error or business rule violation
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            status: 400
+            message: "BSN cannot be your phone number, genius."
+            timestamp: "2025-04-16T04:20:00Z"
+
+  # ─────────────────────────────────────────────
+  # REUSABLE PARAMETERS
+  # ─────────────────────────────────────────────
+  parameters:
+    pageParam:
+      name: page
+      in: query
+      schema:
+        type: integer
+        default: 0
+    sizeParam:
+      name: size
+      in: query
+      schema:
+        type: integer
+        default: 20
+
+# ─────────────────────────────────────────────
+# PATHS
+# ─────────────────────────────────────────────
+paths:
+
+  # ══════════════════════════════════════════
+  # AUTH
+  # ══════════════════════════════════════════
+
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Customer self-registration
+      description: >
+        Registers a new customer. No bank account is created yet —
+        an employee must approve first. Customer can log in after
+        registration but only sees a welcome page. No money for you yet.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+            example:
+              firstName: Giga
+              lastName: Chad
+              email: gigachad@gigabank.nl
+              password: ILoveMoney123!
+              bsn: "069420666"
+              phoneNumber: "+31612345678"
+      responses:
+        '201':
+          description: Registration successful, now go wait for approval like everyone else
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserSummary'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          description: Email already in use — you already exist, stop it
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                status: 409
+                message: "gigachad@gigabank.nl is taken. Be more original."
+                timestamp: "2025-04-16T04:20:00Z"
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Login (customer or employee)
+      description: Returns a JWT on successful authentication. Guard it with your life.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+            example:
+              email: gigachad@gigabank.nl
+              password: ILoveMoney123!
+      responses:
+        '200':
+          description: Login successful — here is your golden ticket
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          description: Wrong credentials — did you forget your password again?
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                status: 401
+                message: "Wrong password. Classic."
+                timestamp: "2025-04-16T04:20:00Z"
+
+  # ══════════════════════════════════════════
+  # USERS (employee-facing)
+  # ══════════════════════════════════════════
+
+  /users:
+    get:
+      tags: [Users]
+      summary: Get all users (employee only)
+      description: >
+        Returns a paginated list of all customers.
+        Use approved=false to find the peasants still waiting for their accounts.
+      parameters:
+        - $ref: '#/components/parameters/pageParam'
+        - $ref: '#/components/parameters/sizeParam'
+        - name: approved
+          in: query
+          description: Filter by approval status — false to find the waitlist
+          required: false
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: Here are all your customers, your highness
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PagedUsers'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /users/{userId}:
+    get:
+      tags: [Users]
+      summary: Get a specific user (employee only)
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+          example: 1
+      responses:
+        '200':
+          description: Found the guy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserSummary'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ══════════════════════════════════════════
+  # ACCOUNTS
+  # ══════════════════════════════════════════
+
+  /accounts:
+    get:
+      tags: [Accounts]
+      summary: Get accounts
+      description: >
+        Employee: returns all customer accounts — the whole kingdom.
+        Customer: returns only their own accounts — stay in your lane.
+      parameters:
+        - $ref: '#/components/parameters/pageParam'
+        - $ref: '#/components/parameters/sizeParam'
+      responses:
+        '200':
+          description: Accounts retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PagedAccounts'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /accounts/search:
+    get:
+      tags: [Accounts]
+      summary: Find IBAN by customer name (customer only)
+      description: >
+        Search for another customer's IBAN using first and last name.
+        Returns only IBAN and name — we're a bank, not a stalking service.
+      parameters:
+        - name: firstName
+          in: query
+          required: true
+          schema:
+            type: string
+          example: Broke
+        - name: lastName
+          in: query
+          required: true
+          schema:
+            type: string
+          example: Boy
+      responses:
+        '200':
+          description: Found your guy — now send them money or don't
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/IbanSearchResult'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /accounts/{iban}:
+    get:
+      tags: [Accounts]
+      summary: Get account by IBAN
+      description: >
+        Customer: can only see their own accounts — no peeking.
+        Employee: can see anyone's account — all-seeing eye mode.
+      parameters:
+        - name: iban
+          in: path
+          required: true
+          schema:
+            type: string
+          example: NL69INHO0420666999
+      responses:
+        '200':
+          description: Account found — behold the numbers
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountDetails'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /accounts/{iban}/close:
+    patch:
+      tags: [Accounts]
+      summary: Close an account (employee only)
+      description: Goodbye account. It was nice knowing you.
+      parameters:
+        - name: iban
+          in: path
+          required: true
+          schema:
+            type: string
+          example: NL69INHO0420666999
+      responses:
+        '200':
+          description: Account closed — it's gone, it's done, it's over
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Account'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /accounts/{iban}/limits:
+    patch:
+      tags: [Accounts]
+      summary: Update transfer limits on an account (employee only)
+      description: The employee decides how much chaos a customer is allowed to cause per day.
+      parameters:
+        - name: iban
+          in: path
+          required: true
+          schema:
+            type: string
+          example: NL69INHO0420666999
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateLimitsRequest'
+            example:
+              absoluteLimit: -50.00
+              dailyTransferLimit: 500.00
+      responses:
+        '200':
+          description: Limits updated — chaos contained
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Account'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /users/{userId}/accounts:
+    post:
+      tags: [Accounts]
+      summary: Approve customer and create accounts (employee only)
+      description: >
+        The moment a peasant becomes a real customer.
+        Creates both checking and savings accounts.
+        IBAN format: NLxxINHO0xxxxxxxxx. Sets initial limits.
+        Welcome to the banking system, buddy.
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+          example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAccountsRequest'
+            example:
+              absoluteLimit: -50.00
+              dailyTransferLimit: 10000.00
+      responses:
+        '201':
+          description: Accounts created — they're in the system now
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Account'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Customer already has accounts — double dipping denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                status: 409
+                message: "This customer already has accounts. Greedy."
+                timestamp: "2025-04-16T04:20:00Z"
+
+  # ══════════════════════════════════════════
+  # TRANSACTIONS
+  # ══════════════════════════════════════════
+
+  /transactions:
+    get:
+      tags: [Transactions]
+      summary: Get transactions
+      description: >
+        Employee: all transactions in the system — every euro that ever moved.
+        Customer: their own transaction history — the receipts don't lie.
+        Filter by date, amount, or IBAN.
+      parameters:
+        - $ref: '#/components/parameters/pageParam'
+        - $ref: '#/components/parameters/sizeParam'
+        - name: iban
+          in: query
+          description: Filter by a specific IBAN (from or to)
+          schema:
+            type: string
+          example: NL69INHO0420666999
+        - name: startDate
+          in: query
+          description: Filter transactions from this date (inclusive)
+          schema:
+            type: string
+            format: date
+          example: "2025-01-01"
+        - name: endDate
+          in: query
+          description: Filter transactions up to this date (inclusive)
+          schema:
+            type: string
+            format: date
+          example: "2025-12-31"
+        - name: amountOperator
+          in: query
+          description: "Comparison operator: lt (less than), gt (greater than), eq (equal to)"
+          schema:
+            type: string
+            enum: [lt, gt, eq]
+          example: gt
+        - name: amount
+          in: query
+          description: Amount value to compare against
+          schema:
+            type: number
+            format: double
+          example: 100.00
+      responses:
+        '200':
+          description: Transactions retrieved — the receipts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PagedTransactions'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      tags: [Transactions]
+      summary: Initiate a transfer
+      description: >
+        Customer: transfer between own accounts or send money to another customer's checking account.
+        Limits are enforced — no funny business.
+
+        Employee: transfer between any two customer checking accounts.
+        With great power comes great responsibility.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransferRequest'
+            example:
+              fromIban: NL69INHO0420666999
+              toIban: NL42INHO0000000001
+              amount: 4.20
+      responses:
+        '201':
+          description: Transfer completed — money moved, no going back
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transaction'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          description: Business rule violation — you played yourself
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                status: 422
+                message: "Daily transfer limit exceeded. Slow down, big spender."
+                timestamp: "2025-04-16T04:20:00Z"
+
+  /transactions/{userId}:
+    get:
+      tags: [Transactions]
+      summary: Get transactions for a specific customer (employee only)
+      description: Pull up the full financial autobiography of one customer.
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+          example: 1
+        - $ref: '#/components/parameters/pageParam'
+        - $ref: '#/components/parameters/sizeParam'
+      responses:
+        '200':
+          description: Their entire financial life, paginated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PagedTransactions'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ══════════════════════════════════════════
+  # ATM
+  # ══════════════════════════════════════════
+
+  /atm/deposit:
+    post:
+      tags: [ATM]
+      summary: Deposit money via ATM (customer only)
+      description: >
+        Stuff cash into the machine like it owes you money.
+        Transaction recorded. Daily and absolute limits enforced.
+        The ATM does not care about your feelings.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AtmRequest'
+            example:
+              iban: NL69INHO0420666999
+              amount: 500.00
+      responses:
+        '201':
+          description: Deposit successful — money in, life good
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transaction'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          description: Limit exceeded or account inactive — rejected by a machine, rough
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                status: 422
+                message: "Account is closed. The ATM laughs at you."
+                timestamp: "2025-04-16T04:20:00Z"
+
+  /atm/withdraw:
+    post:
+      tags: [ATM]
+      summary: Withdraw money via ATM (customer only)
+      description: >
+        Take money out. Classic. Balance updated instantly.
+        Daily and absolute limits enforced.
+        You cannot withdraw what you do not have. This is not a casino.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AtmRequest'
+            example:
+              iban: NL69INHO0420666999
+              amount: 250.00
+      responses:
+        '201':
+          description: Withdrawal successful — enjoy your cash, spend it wisely
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Transaction'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          description: Insufficient funds or limit exceeded — you are cooked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                status: 422
+                message: "Insufficient funds. Maybe try earning more money."
+                timestamp: "2025-04-16T04:20:00Z"

@@ -35,6 +35,7 @@ public class SecurityConfig {
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         return http
                 .csrf(AbstractHttpConfigurer::disable)
+                .cors(Customizer.withDefaults())
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(a -> a
                         .requestMatchers(
@@ -44,8 +45,29 @@ public class SecurityConfig {
                                 "/h2-console/**")
                         .permitAll()
                         .anyRequest().authenticated())
-                .headers(h -> h.frameOptions(Customizer.withDefaults()))
+                // Fix for H2 Console specifically
+                .headers(h -> h.frameOptions(frame -> frame.sameOrigin()))
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
+    }
+    @Bean
+    public org.springframework.web.cors.CorsConfigurationSource corsConfigurationSource() {
+        org.springframework.web.cors.CorsConfiguration configuration = new org.springframework.web.cors.CorsConfiguration();
+
+        // Allow your frontend origin
+        configuration.setAllowedOrigins(java.util.List.of("http://localhost:5173"));
+
+        // Allow standard HTTP methods
+        configuration.setAllowedMethods(java.util.List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+
+        // Allow all headers (important for Authorization headers with JWT)
+        configuration.setAllowedHeaders(java.util.List.of("*"));
+
+        // Allow the browser to send cookies or auth headers
+        configuration.setAllowCredentials(true);
+
+        org.springframework.web.cors.UrlBasedCorsConfigurationSource source = new org.springframework.web.cors.UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
     }
 }
