@@ -6,6 +6,7 @@ import com.bankie.bankie_api.dto.response.LoginResponse;
 import com.bankie.bankie_api.dto.response.UserSummary;
 import com.bankie.bankie_api.exception.EmailAlreadyExistsException;
 import com.bankie.bankie_api.enums.Role;
+import com.bankie.bankie_api.repository.UserRepository;
 import com.bankie.bankie_api.security.JwtService;
 import com.bankie.bankie_api.service.AuthService;
 import tools.jackson.databind.ObjectMapper;
@@ -31,6 +32,7 @@ class AuthControllerTest {
     @Autowired ObjectMapper objectMapper;
     @MockitoBean AuthService authService;
     @MockitoBean JwtService jwtService;
+    @MockitoBean UserRepository userRepository;
 
     @Test
     void register_returns201AndUserSummary() throws Exception {

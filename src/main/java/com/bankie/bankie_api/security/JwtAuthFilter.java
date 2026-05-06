@@ -1,5 +1,7 @@
 package com.bankie.bankie_api.security;
 
+import com.bankie.bankie_api.entity.User;
+import com.bankie.bankie_api.repository.UserRepository;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
@@ -22,6 +24,7 @@ import java.util.List;
 public class JwtAuthFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
+    private final UserRepository userRepository;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
@@ -30,11 +33,15 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         if (header != null && header.startsWith("Bearer ")) {
             try {
                 Claims claims = jwtService.parse(header.substring(7));
-                var auth = new UsernamePasswordAuthenticationToken(
-                        claims.getSubject(),
-                        null,
-                        List.of(new SimpleGrantedAuthority("ROLE_" + claims.get("role", String.class))));
-                SecurityContextHolder.getContext().setAuthentication(auth);
+                userRepository.findByEmail(claims.getSubject())
+                        .filter(User::isApproved)
+                        .ifPresent(user -> {
+                            var auth = new UsernamePasswordAuthenticationToken(
+                                    user.getEmail(),
+                                    null,
+                                    List.of(new SimpleGrantedAuthority("ROLE_" + user.getRole().name())));
+                            SecurityContextHolder.getContext().setAuthentication(auth);
+                        });
             } catch (JwtException ignored) {
                 SecurityContextHolder.clearContext();
             }
