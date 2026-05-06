@@ -5,7 +5,7 @@ import com.bankie.bankie_api.entity.User;
 import com.bankie.bankie_api.mapper.UserMapper;
 import com.bankie.bankie_api.service.UserService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page; // CORRECT IMPORT
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.http.ResponseEntity;

@@ -19,5 +19,5 @@ public class AccountResponseDTO {
     private AccountStatus status;
     private Double absoluteLimit;
     private Double dailyTransferLimit;
-    private Long ownerId;
+    private Long userId;
 }
