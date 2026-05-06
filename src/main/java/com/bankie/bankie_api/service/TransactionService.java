@@ -1,8 +1,12 @@
 package com.bankie.bankie_api.service;
 
 import com.bankie.bankie_api.dto.response.TransactionResponse;
+import com.bankie.bankie_api.entity.Account;
 import com.bankie.bankie_api.entity.Transaction;
 import com.bankie.bankie_api.entity.User;
+import com.bankie.bankie_api.enums.Role;
+import com.bankie.bankie_api.exception.CustomerNotFoundException;
+import com.bankie.bankie_api.repository.AccountRepository;
 import com.bankie.bankie_api.repository.TransactionRepository;
 import com.bankie.bankie_api.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -10,6 +14,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -21,10 +26,27 @@ public class TransactionService {
 
     private final TransactionRepository transactionRepository;
     private final UserRepository userRepository;
+    private final AccountRepository accountRepository;
 
     public Page<TransactionResponse> findAll(Pageable pageable) {
-        Page<Transaction> page = transactionRepository.findAll(pageable);
+        return mapWithNames(transactionRepository.findAll(pageable));
+    }
 
+    public Page<TransactionResponse> findByCustomer(Long customerId, Pageable pageable) {
+        User customer = userRepository.findById(customerId)
+                .filter(u -> u.getRole() == Role.CUSTOMER)
+                .orElseThrow(() -> new CustomerNotFoundException(customerId));
+
+        List<String> ibans = accountRepository.findByOwner(customer).stream()
+                .map(Account::getIban)
+                .toList();
+
+        if (ibans.isEmpty()) return Page.empty(pageable);
+
+        return mapWithNames(transactionRepository.findByIbanIn(ibans, pageable));
+    }
+
+    private Page<TransactionResponse> mapWithNames(Page<Transaction> page) {
         Set<Long> userIds = page.stream()
                 .map(Transaction::getInitiatedBy)
                 .filter(Objects::nonNull)

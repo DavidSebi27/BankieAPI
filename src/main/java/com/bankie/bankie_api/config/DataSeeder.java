@@ -1,9 +1,13 @@
 package com.bankie.bankie_api.config;
 
+import com.bankie.bankie_api.entity.Account;
 import com.bankie.bankie_api.entity.Transaction;
 import com.bankie.bankie_api.entity.User;
+import com.bankie.bankie_api.enums.AccountStatus;
+import com.bankie.bankie_api.enums.AccountType;
 import com.bankie.bankie_api.enums.Role;
 import com.bankie.bankie_api.enums.TransactionType;
+import com.bankie.bankie_api.repository.AccountRepository;
 import com.bankie.bankie_api.repository.TransactionRepository;
 import com.bankie.bankie_api.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +24,7 @@ import java.util.List;
 public class DataSeeder implements CommandLineRunner {
 
     private final UserRepository userRepository;
+    private final AccountRepository accountRepository;
     private final TransactionRepository transactionRepository;
     private final PasswordEncoder passwordEncoder;
 
@@ -62,6 +67,28 @@ public class DataSeeder implements CommandLineRunner {
 
         String aliceIban = "NL01BANK0000000001";
         String bobIban   = "NL01BANK0000000002";
+
+        accountRepository.saveAll(List.of(
+                Account.builder()
+                        .iban(aliceIban)
+                        .type(AccountType.CHECKING)
+                        .balance(new BigDecimal("500.00"))
+                        .status(AccountStatus.ACTIVE)
+                        .absoluteLimit(new BigDecimal("0.00"))
+                        .dailyTransferLimit(new BigDecimal("2500.00"))
+                        .owner(alice)
+                        .build(),
+                Account.builder()
+                        .iban(bobIban)
+                        .type(AccountType.CHECKING)
+                        .balance(new BigDecimal("1100.00"))
+                        .status(AccountStatus.ACTIVE)
+                        .absoluteLimit(new BigDecimal("0.00"))
+                        .dailyTransferLimit(new BigDecimal("2500.00"))
+                        .owner(bob)
+                        .build()
+        ));
+
         LocalDateTime now = LocalDateTime.now();
 
         transactionRepository.saveAll(List.of(
