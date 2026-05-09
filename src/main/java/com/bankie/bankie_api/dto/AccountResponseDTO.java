@@ -7,6 +7,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
+
 @Data
 @Builder
 @NoArgsConstructor
@@ -14,10 +16,10 @@ import lombok.NoArgsConstructor;
 public class AccountResponseDTO {
     private String iban;
     private AccountType type;
-    private Double balance;
+    private BigDecimal balance;
     private String currency;
     private AccountStatus status;
-    private Double absoluteLimit;
-    private Double dailyTransferLimit;
+    private BigDecimal absoluteLimit;
+    private BigDecimal dailyTransferLimit;
     private Long userId;
 }

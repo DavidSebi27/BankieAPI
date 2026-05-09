@@ -5,6 +5,8 @@ import com.bankie.bankie_api.enums.AccountType;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.math.BigDecimal;
+
 @Entity
 @Table(name = "accounts")
 @Getter
@@ -19,15 +21,18 @@ public class Account {
     @Enumerated(EnumType.STRING)
     private AccountType type;
 
-    private Double balance;
+    @Column(precision = 19, scale = 2)
+    private BigDecimal balance;
     @Builder.Default
     private String currency = "EUR";
 
     @Enumerated(EnumType.STRING)
     private AccountStatus status;
 
-    private Double absoluteLimit;
-    private Double dailyTransferLimit;
+    @Column(precision = 19, scale = 2)
+    private BigDecimal absoluteLimit;
+    @Column(precision = 19, scale = 2)
+    private BigDecimal dailyTransferLimit;
 
     @ManyToOne
     @JoinColumn(name = "user_id")

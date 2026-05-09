@@ -15,6 +15,7 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Component
@@ -56,20 +57,20 @@ public class DataLoader implements CommandLineRunner {
             Account checking = Account.builder()
                     .iban("NL69INHO0420666999")
                     .type(AccountType.CHECKING)
-                    .balance(1000.00)
+                    .balance(new BigDecimal("1000.00"))
                     .status(AccountStatus.ACTIVE)
-                    .absoluteLimit(-50.0)
-                    .dailyTransferLimit(500.0)
+                    .absoluteLimit(new BigDecimal("-50.0"))
+                    .dailyTransferLimit(new BigDecimal("500.0"))
                     .user(customer)
                     .build();
 
             Account savings = Account.builder()
                     .iban("NL42INHO0000000001")
                     .type(AccountType.SAVINGS)
-                    .balance(5000.00)
+                    .balance(new BigDecimal("5000.00"))
                     .status(AccountStatus.ACTIVE)
-                    .absoluteLimit(0.0)
-                    .dailyTransferLimit(1000.0)
+                    .absoluteLimit(new BigDecimal("0.0"))
+                    .dailyTransferLimit(new BigDecimal("1000.0"))
                     .user(customer)
                     .build();
 
@@ -80,7 +81,7 @@ public class DataLoader implements CommandLineRunner {
                     .type(TransactionType.TRANSFER)
                     .fromIban(savings.getIban())
                     .toIban(checking.getIban())
-                    .amount(250.0)
+                    .amount(new BigDecimal("250.0"))
                     .timestamp(LocalDateTime.now())
                     .initiatedBy(customer.getId())
                     .build();

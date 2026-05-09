@@ -22,7 +22,7 @@ public class AccountController {
 
     @GetMapping
     public ResponseEntity<Page<AccountResponseDTO>> getAccounts(
-            @PageableDefault(size = 20) Pageable pageable,
+            @PageableDefault(size = 20, sort = "iban") Pageable pageable,
             Authentication authentication) {
 
         Page<Account> accounts = accountService.getAccountsForUser(authentication, pageable);
