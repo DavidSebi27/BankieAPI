@@ -1,4 +1,4 @@
-package com.bankie.bankie_api.dto;
+package com.bankie.bankie_api.dto.response;
 
 import com.bankie.bankie_api.enums.TransactionType;
 import lombok.AllArgsConstructor;

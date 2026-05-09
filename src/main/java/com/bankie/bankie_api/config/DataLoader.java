@@ -88,9 +88,65 @@ public class DataLoader implements CommandLineRunner {
 
             transactionRepository.save(initialTransfer);
 
+            User jane = User.builder()
+                    .firstName("Jane")
+                    .lastName("Doe")
+                    .email("jane.doe@example.com")
+                    .password(passwordEncoder.encode("JanePass123!"))
+                    .bsn("111222333")
+                    .phoneNumber("+31611111111")
+                    .role(Role.CUSTOMER)
+                    .approved(true)
+                    .build();
+            userRepository.save(jane);
+
+            Account janeAccount = Account.builder()
+                    .iban("NL01BANK0123456789")
+                    .type(AccountType.CHECKING)
+                    .balance(new BigDecimal("2500.50"))
+                    .status(AccountStatus.ACTIVE)
+                    .absoluteLimit(new BigDecimal("0.0"))
+                    .dailyTransferLimit(new BigDecimal("1000.0"))
+                    .user(jane)
+                    .build();
+            accountRepository.save(janeAccount);
+
+            User john = User.builder()
+                    .firstName("John")
+                    .lastName("Smith")
+                    .email("john.smith@example.com")
+                    .password(passwordEncoder.encode("JohnPass123!"))
+                    .bsn("444555666")
+                    .phoneNumber("+31622222222")
+                    .role(Role.CUSTOMER)
+                    .approved(true)
+                    .build();
+            userRepository.save(john);
+
+            Account johnAccount = Account.builder()
+                    .iban("NL02BANK9876543210")
+                    .type(AccountType.CHECKING)
+                    .balance(new BigDecimal("150.00"))
+                    .status(AccountStatus.ACTIVE)
+                    .absoluteLimit(new BigDecimal("-100.0"))
+                    .dailyTransferLimit(new BigDecimal("200.0"))
+                    .user(john)
+                    .build();
+            accountRepository.save(johnAccount);
+
+            User pete = User.builder()
+                    .firstName("Pending")
+                    .lastName("Pete")
+                    .email("pete@waiting.nl")
+                    .password(passwordEncoder.encode("PetePass123!"))
+                    .bsn("777888999")
+                    .phoneNumber("+31633333333")
+                    .role(Role.CUSTOMER)
+                    .approved(false)
+                    .build();
+            userRepository.save(pete);
+
             System.out.println("--- Database Seeded Successfully ---");
-            System.out.println("Employee: admin@bankie.nl");
-            System.out.println("Customer: gigachad@gigabank.nl");
         }
     }
 }

@@ -30,4 +30,17 @@ public class AccountService {
 
         return accountRepository.findByUserId(user.getId(), pageable);
     }
+
+    public Page<Account> searchAccounts(String firstName, String lastName, Pageable pageable, Authentication auth)
+    {
+        boolean isEmployee = auth.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_EMPLOYEE"));
+        Page<Account> results = accountRepository.searchByOwnerNames(firstName, lastName, pageable);
+
+        if (!isEmployee) {
+            return accountRepository.searchApprovedByOwnerNames(firstName, lastName, pageable);
+        }
+
+        return results;
+    }
 }
