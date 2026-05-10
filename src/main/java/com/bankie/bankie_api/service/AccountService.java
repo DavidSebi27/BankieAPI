@@ -102,9 +102,10 @@ public class AccountService {
     public Account closeAccount(String iban) {
         Account account = accountRepository.findById(iban)
                 .orElseThrow(() -> new EntityNotFoundException("Account not found: " + iban));
-        if (account.getStatus() == AccountStatus.CLOSED) {
+        if (account.getStatus() == AccountStatus.CLOSED)
             throw new BusinessRuleException("Account is already closed");
-        }
+        if (account.getBalance().compareTo(BigDecimal.ZERO) != 0)
+            throw new BusinessRuleException("Account balance must be 0 before closing");
         account.setStatus(AccountStatus.CLOSED);
         return accountRepository.save(account);
     }
