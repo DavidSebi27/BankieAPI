@@ -12,12 +12,13 @@ public class AccountMapper {
 
         return AccountResponseDTO.builder()
                 .iban(account.getIban())
+                .type(account.getType())
                 .balance(account.getBalance())
                 .currency(account.getCurrency())
                 .status(account.getStatus())
                 .absoluteLimit(account.getAbsoluteLimit())
                 .dailyTransferLimit(account.getDailyTransferLimit())
-                .ownerId(account.getOwner() != null ? account.getOwner().getId() : null)
+                .userId(account.getUser() != null ? account.getUser().getId() : null)
                 .build();
     }
 }
