@@ -25,3 +25,7 @@ springdoc:
     path: /swagger-ui.html
   api-docs:
     path: /api-docs
+
+bankie:
+  iban:
+    bank-code: INHO0
