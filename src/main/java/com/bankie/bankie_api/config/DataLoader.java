@@ -146,6 +146,45 @@ public class DataLoader implements CommandLineRunner {
                     .build();
             userRepository.save(pete);
 
+            LocalDateTime now = LocalDateTime.now();
+            transactionRepository.save(Transaction.builder()
+                    .type(TransactionType.DEPOSIT)
+                    .toIban(janeAccount.getIban())
+                    .amount(new BigDecimal("250.00"))
+                    .timestamp(now.minusDays(3))
+                    .initiatedBy(jane.getId())
+                    .build());
+            transactionRepository.save(Transaction.builder()
+                    .type(TransactionType.TRANSFER)
+                    .fromIban(janeAccount.getIban())
+                    .toIban(johnAccount.getIban())
+                    .amount(new BigDecimal("75.50"))
+                    .timestamp(now.minusDays(2).minusHours(4))
+                    .initiatedBy(jane.getId())
+                    .build());
+            transactionRepository.save(Transaction.builder()
+                    .type(TransactionType.WITHDRAWAL)
+                    .fromIban(johnAccount.getIban())
+                    .amount(new BigDecimal("40.00"))
+                    .timestamp(now.minusDays(2))
+                    .initiatedBy(john.getId())
+                    .build());
+            transactionRepository.save(Transaction.builder()
+                    .type(TransactionType.TRANSFER)
+                    .fromIban(johnAccount.getIban())
+                    .toIban(janeAccount.getIban())
+                    .amount(new BigDecimal("125.00"))
+                    .timestamp(now.minusDays(1).minusHours(7))
+                    .initiatedBy(admin.getId())
+                    .build());
+            transactionRepository.save(Transaction.builder()
+                    .type(TransactionType.DEPOSIT)
+                    .toIban(johnAccount.getIban())
+                    .amount(new BigDecimal("1000.00"))
+                    .timestamp(now.minusDays(1))
+                    .initiatedBy(john.getId())
+                    .build());
+
             System.out.println("--- Database Seeded Successfully ---");
         }
     }
