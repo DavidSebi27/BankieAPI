@@ -10,6 +10,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import com.bankie.bankie_api.dto.PageResponse;
 import org.springframework.data.domain.Page; // CORRECT IMPORT
 import org.springframework.data.domain.Pageable;
 import org.springdoc.core.annotations.ParameterObject;
@@ -55,7 +56,7 @@ public class UserController {
             @ApiResponse(responseCode = "401", description = "Missing or invalid JWT token."),
             @ApiResponse(responseCode = "403", description = "Authenticated user does not have the EMPLOYEE role.")
     })
-    public ResponseEntity<Page<UserResponseDTO>> getAllUsers(
+    public ResponseEntity<PageResponse<UserResponseDTO>> getAllUsers(
             @Parameter(description = "Filter by approval status. false = pending, true = approved. Omit to return all.")
             @RequestParam(required = false) Boolean approved,
             @ParameterObject Pageable pageable) {
@@ -63,7 +64,7 @@ public class UserController {
         Page<User> users = userService.findAll(approved, pageable);
 
         // Convert the Page of Entities into a Page of DTOs
-        Page<UserResponseDTO> response = users.map(userMapper::toResponseDto);
+        PageResponse<UserResponseDTO> response = PageResponse.from(users.map(userMapper::toResponseDto));
 
         return ResponseEntity.ok(response);
     }
