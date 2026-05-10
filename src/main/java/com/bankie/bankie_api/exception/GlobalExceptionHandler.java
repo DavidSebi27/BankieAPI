@@ -28,7 +28,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ErrorResponse> handleAccessDenied(AccessDeniedException ex) {
-        return status(HttpStatus.FORBIDDEN, "Access denied");
+        return status(HttpStatus.NOT_FOUND, "Not Found");
     }
 
     @ExceptionHandler({EmailAlreadyExistsException.class, BsnAlreadyExistsException.class})
@@ -39,6 +39,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(BusinessRuleException.class)
     public ResponseEntity<ErrorResponse> handleBusinessRule(BusinessRuleException ex) {
         return status(HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage());
+    }
+
+    @ExceptionHandler(CustomerNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleCustomerNotFound(CustomerNotFoundException ex) {
+        return status(HttpStatus.NOT_FOUND, "Not Found");
     }
 
     private static ResponseEntity<ErrorResponse> status(HttpStatus status, String message) {

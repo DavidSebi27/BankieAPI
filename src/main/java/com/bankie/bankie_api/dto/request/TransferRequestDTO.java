@@ -1,8 +1,10 @@
-package com.bankie.bankie_api.dto;
+package com.bankie.bankie_api.dto.request;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+
+import java.math.BigDecimal;
 
 @Data
 @NoArgsConstructor
@@ -10,5 +12,5 @@ import lombok.NoArgsConstructor;
 public class TransferRequestDTO {
     private String fromIban;
     private String toIban;
-    private Double amount;
+    private BigDecimal amount;
 }
