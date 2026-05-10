@@ -1,4 +1,4 @@
-package com.bankie.bankie_api.dto;
+package com.bankie.bankie_api.dto.request;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -9,7 +9,8 @@ import java.math.BigDecimal;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class CreateAccountRequestDTO {
-    private BigDecimal absoluteLimit;
-    private BigDecimal dailyTransferLimit;
+public class TransferRequestDTO {
+    private String fromIban;
+    private String toIban;
+    private BigDecimal amount;
 }

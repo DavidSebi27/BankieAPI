@@ -1,7 +1,7 @@
 package com.bankie.bankie_api.mapper;
 
-import com.bankie.bankie_api.dto.UserRequestDTO;
-import com.bankie.bankie_api.dto.UserResponseDTO;
+import com.bankie.bankie_api.dto.request.UserRequestDTO;
+import com.bankie.bankie_api.dto.response.UserResponseDTO;
 import com.bankie.bankie_api.entity.User;
 import com.bankie.bankie_api.enums.Role;
 import org.springframework.stereotype.Component;

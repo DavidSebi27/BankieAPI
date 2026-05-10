@@ -1,4 +1,4 @@
-package com.bankie.bankie_api.dto;
+package com.bankie.bankie_api.dto.request;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

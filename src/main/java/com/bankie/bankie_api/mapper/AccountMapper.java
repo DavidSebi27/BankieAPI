@@ -1,6 +1,7 @@
 package com.bankie.bankie_api.mapper;
 
-import com.bankie.bankie_api.dto.AccountResponseDTO;
+import com.bankie.bankie_api.dto.response.AccountResponseDTO;
+import com.bankie.bankie_api.dto.response.SearchAccountResponseDTO;
 import com.bankie.bankie_api.entity.Account;
 import org.springframework.stereotype.Component;
 
@@ -19,6 +20,17 @@ public class AccountMapper {
                 .absoluteLimit(account.getAbsoluteLimit())
                 .dailyTransferLimit(account.getDailyTransferLimit())
                 .userId(account.getUser() != null ? account.getUser().getId() : null)
+                .build();
+    }
+
+    public SearchAccountResponseDTO toSearchResponseDto(Account account)
+    {
+        if (account == null) return null;
+
+        return SearchAccountResponseDTO.builder()
+                .iban(account.getIban())
+                .firstName(account.getUser().getFirstName())
+                .lastName(account.getUser().getLastName())
                 .build();
     }
 }
