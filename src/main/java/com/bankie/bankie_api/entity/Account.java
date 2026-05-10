@@ -36,6 +36,7 @@ public class Account {
     private BigDecimal dailyTransferLimit;
 
     @ManyToOne
-    @JoinColumn(name = "owner_id")
-    private User owner;
+    @JoinColumn(name = "user_id")
+    private User user;
+
 }

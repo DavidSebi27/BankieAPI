@@ -1,7 +1,8 @@
 package com.bankie.bankie_api.controller;
 
-import com.bankie.bankie_api.dto.response.AccountResponse;
+import com.bankie.bankie_api.dto.response.AccountResponseDTO;
 import com.bankie.bankie_api.entity.User;
+import com.bankie.bankie_api.mapper.AccountMapper;
 import com.bankie.bankie_api.repository.AccountRepository;
 import com.bankie.bankie_api.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -19,10 +20,13 @@ public class MeController {
 
     private final UserRepository userRepository;
     private final AccountRepository accountRepository;
+    private final AccountMapper accountMapper;
 
     @GetMapping("/accounts")
-    public List<AccountResponse> myAccounts(@AuthenticationPrincipal String email) {
+    public List<AccountResponseDTO> myAccounts(@AuthenticationPrincipal String email) {
         User user = userRepository.findByEmail(email).orElseThrow();
-        return accountRepository.findByOwner(user).stream().map(AccountResponse::from).toList();
+        return accountRepository.findByUser(user).stream()
+                .map(accountMapper::toResponseDto)
+                .toList();
     }
 }

@@ -1,6 +1,6 @@
 package com.bankie.bankie_api.controller;
 
-import com.bankie.bankie_api.dto.response.TransactionResponse;
+import com.bankie.bankie_api.dto.response.TransactionResponseDTO;
 import com.bankie.bankie_api.service.TransactionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -20,7 +20,7 @@ public class CustomerController {
     private final TransactionService transactionService;
 
     @GetMapping("/{customerId}/transactions")
-    public Page<TransactionResponse> transactions(
+    public Page<TransactionResponseDTO> transactions(
             @PathVariable Long customerId,
             @PageableDefault(size = 20, sort = "timestamp", direction = Sort.Direction.DESC) Pageable pageable) {
         return transactionService.findByCustomer(customerId, pageable);

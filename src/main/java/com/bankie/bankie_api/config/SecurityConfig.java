@@ -71,7 +71,7 @@ public class SecurityConfig {
                 .exceptionHandling(eh -> eh
                         .authenticationEntryPoint((req, res, ex) -> writeNotFound(res, objectMapper))
                         .accessDeniedHandler((req, res, ex) -> writeNotFound(res, objectMapper)))
-                .headers(h -> h.frameOptions(Customizer.withDefaults()))
+                .headers(h -> h.frameOptions(frame -> frame.sameOrigin()))
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
     }
