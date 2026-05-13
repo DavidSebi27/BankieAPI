@@ -17,7 +17,9 @@ public class TransactionResponseDTO {
     private Long id;
     private TransactionType type;
     private String fromIban;
+    private String fromName;
     private String toIban;
+    private String toName;
     private BigDecimal amount;
     private String currency;
     private LocalDateTime timestamp;

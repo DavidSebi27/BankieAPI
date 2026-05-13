@@ -6,14 +6,16 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class TransactionMapper {
-    public TransactionResponseDTO toResponseDto(Transaction transaction){
+    public TransactionResponseDTO toResponseDto(Transaction transaction, String fromName, String toName){
         if (transaction == null) return null;
 
         return TransactionResponseDTO.builder()
                 .id(transaction.getId())
                 .type(transaction.getType())
                 .fromIban(transaction.getFromIban())
+                .fromName(fromName)
                 .toIban(transaction.getToIban())
+                .toName(toName)
                 .amount(transaction.getAmount())
                 .currency(transaction.getCurrency())
                 .timestamp(transaction.getTimestamp())
