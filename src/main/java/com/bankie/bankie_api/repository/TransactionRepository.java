@@ -11,9 +11,14 @@ import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Collection;
 
 @Repository
 public interface TransactionRepository extends JpaRepository<Transaction, Long> {
+
+    @Query("SELECT t FROM Transaction t WHERE t.fromIban IN :ibans OR t.toIban IN :ibans")
+    Page<Transaction> findByIbanIn(@Param("ibans") Collection<String> ibans, Pageable pageable);
+
     @Query(value = "SELECT t FROM Transaction t " +
             "LEFT JOIN FETCH t.fromAccount fa " +
             "LEFT JOIN FETCH fa.user " +
@@ -30,7 +35,8 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
             countQuery = "SELECT count(t) FROM Transaction t " +
                     "WHERE (:id IS NULL OR t.initiatedBy = :id) " +
                     "AND (:type IS NULL OR t.type = :type) " +
-                    "AND (:iban IS NULL OR t.fromIban = :iban OR t.toIban = :iban) " +
+                    "AND (:iban IS NULL OR LOWER(t.fromIban) LIKE LOWER(CONCAT('%', :iban, '%')) " +
+                    "OR LOWER(t.toIban) LIKE LOWER(CONCAT('%', :iban, '%'))) " +
                     "AND (:start IS NULL OR t.timestamp >= :start) " +
                     "AND (:end IS NULL OR t.timestamp <= :end) " +
                     "AND (:min IS NULL OR t.amount >= :min) " +

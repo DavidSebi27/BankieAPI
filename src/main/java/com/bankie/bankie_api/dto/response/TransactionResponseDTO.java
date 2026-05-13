@@ -24,4 +24,5 @@ public class TransactionResponseDTO {
     private String currency;
     private LocalDateTime timestamp;
     private Long initiatedBy;
+    private String initiatedByName;
 }

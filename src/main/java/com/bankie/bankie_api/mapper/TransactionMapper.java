@@ -2,24 +2,18 @@ package com.bankie.bankie_api.mapper;
 
 import com.bankie.bankie_api.dto.response.TransactionResponseDTO;
 import com.bankie.bankie_api.entity.Transaction;
-import org.springframework.stereotype.Component;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
+import org.mapstruct.MappingConstants;
 
-@Component
-public class TransactionMapper {
-    public TransactionResponseDTO toResponseDto(Transaction transaction, String fromName, String toName){
-        if (transaction == null) return null;
+@Mapper(componentModel = MappingConstants.ComponentModel.SPRING)
+public interface TransactionMapper {
 
-        return TransactionResponseDTO.builder()
-                .id(transaction.getId())
-                .type(transaction.getType())
-                .fromIban(transaction.getFromIban())
-                .fromName(fromName)
-                .toIban(transaction.getToIban())
-                .toName(toName)
-                .amount(transaction.getAmount())
-                .currency(transaction.getCurrency())
-                .timestamp(transaction.getTimestamp())
-                .initiatedBy(transaction.getInitiatedBy())
-                .build();
-    }
+    @Mapping(target = "initiatedByName", ignore = true)
+    TransactionResponseDTO toResponseDto(Transaction transaction);
+
+    @Mapping(target = "fromName", source = "fromName")
+    @Mapping(target = "toName", source = "toName")
+    @Mapping(target = "initiatedBy", source = "transaction.initiatedBy")
+    TransactionResponseDTO toResponseDto(Transaction transaction, String fromName, String toName);
 }

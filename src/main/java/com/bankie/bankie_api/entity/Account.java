@@ -31,6 +31,7 @@ public class Account {
 
     @Column(precision = 19, scale = 2)
     private BigDecimal absoluteLimit;
+
     @Column(precision = 19, scale = 2)
     private BigDecimal dailyTransferLimit;
 
