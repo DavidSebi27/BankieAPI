@@ -1,10 +1,15 @@
 package com.bankie.bankie_api.service;
 
+import com.bankie.bankie_api.dto.request.TransferRequestDTO;
 import com.bankie.bankie_api.dto.response.TransactionResponseDTO;
 import com.bankie.bankie_api.entity.Account;
 import com.bankie.bankie_api.entity.Transaction;
 import com.bankie.bankie_api.entity.User;
+import com.bankie.bankie_api.enums.AccountStatus;
+import com.bankie.bankie_api.enums.AccountType;
 import com.bankie.bankie_api.enums.Role;
+import com.bankie.bankie_api.enums.TransactionType;
+import com.bankie.bankie_api.exception.BusinessRuleException;
 import com.bankie.bankie_api.exception.CustomerNotFoundException;
 import com.bankie.bankie_api.mapper.TransactionMapper;
 import com.bankie.bankie_api.repository.AccountRepository;
@@ -14,7 +19,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -46,6 +55,72 @@ public class TransactionService {
         if (ibans.isEmpty()) return Page.empty(pageable);
 
         return mapWithNames(transactionRepository.findByIbanIn(ibans, pageable));
+    }
+
+    @Transactional
+    public TransactionResponseDTO transfer(TransferRequestDTO request, String initiatorEmail) {
+        if (request.getFromIban().equals(request.getToIban())) {
+            throw new BusinessRuleException("Source and destination accounts must be different");
+        }
+
+        Account source = accountRepository.findById(request.getFromIban())
+                .orElseThrow(() -> new BusinessRuleException("Source account not found"));
+        Account destination = accountRepository.findById(request.getToIban())
+                .orElseThrow(() -> new BusinessRuleException("Destination account not found"));
+
+        requireActiveCustomerChecking(source, "Source");
+        requireActiveCustomerChecking(destination, "Destination");
+
+        if (!Objects.equals(source.getCurrency(), destination.getCurrency())) {
+            throw new BusinessRuleException("Accounts must share the same currency");
+        }
+
+        BigDecimal amount = request.getAmount();
+        BigDecimal newBalance = source.getBalance().subtract(amount);
+        if (newBalance.compareTo(source.getAbsoluteLimit()) < 0) {
+            throw new BusinessRuleException("Transfer would breach the source account's absolute limit");
+        }
+
+        LocalDateTime startOfDay = LocalDate.now().atStartOfDay();
+        BigDecimal alreadySentToday = transactionRepository.sumOutgoingSince(
+                source.getIban(), TransactionType.TRANSFER, startOfDay);
+        if (alreadySentToday.add(amount).compareTo(source.getDailyTransferLimit()) > 0) {
+            throw new BusinessRuleException("Transfer exceeds the source account's daily transfer limit");
+        }
+
+        User initiator = userRepository.findByEmail(initiatorEmail)
+                .orElseThrow(() -> new BusinessRuleException("Initiator not found"));
+
+        source.setBalance(newBalance);
+        destination.setBalance(destination.getBalance().add(amount));
+        accountRepository.save(source);
+        accountRepository.save(destination);
+
+        Transaction tx = transactionRepository.save(Transaction.builder()
+                .type(TransactionType.TRANSFER)
+                .fromIban(source.getIban())
+                .toIban(destination.getIban())
+                .amount(amount)
+                .currency(source.getCurrency())
+                .timestamp(LocalDateTime.now())
+                .initiatedBy(initiator.getId())
+                .build());
+
+        TransactionResponseDTO dto = transactionMapper.toResponseDto(tx);
+        dto.setInitiatedByName(initiator.getFirstName() + " " + initiator.getLastName());
+        return dto;
+    }
+
+    private void requireActiveCustomerChecking(Account account, String label) {
+        if (account.getType() != AccountType.CHECKING) {
+            throw new BusinessRuleException(label + " account must be a checking account");
+        }
+        if (account.getStatus() != AccountStatus.ACTIVE) {
+            throw new BusinessRuleException(label + " account is not active");
+        }
+        if (account.getUser() == null || account.getUser().getRole() != Role.CUSTOMER) {
+            throw new BusinessRuleException(label + " account must belong to a customer");
+        }
     }
 
     private Page<TransactionResponseDTO> mapWithNames(Page<Transaction> page) {
