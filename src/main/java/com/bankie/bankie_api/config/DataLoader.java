@@ -26,7 +26,7 @@ public class DataLoader implements CommandLineRunner {
     public void run(String... args) throws Exception {
         if (userRepository.count() == 0) {
             seedDatabase();
-            System.out.println("--- Database Seeded Successfully with Celebrities ---");
+            System.out.println("--- Database Seeded Successfully ---");
         }
     }
 

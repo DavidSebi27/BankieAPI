@@ -1,6 +1,5 @@
 package com.bankie.bankie_api.controller;
 
-import com.bankie.bankie_api.dto.response.UserResponseDTO;
 import com.bankie.bankie_api.dto.PageResponse;
 import com.bankie.bankie_api.dto.response.UserResponseDTO;
 import com.bankie.bankie_api.entity.User;

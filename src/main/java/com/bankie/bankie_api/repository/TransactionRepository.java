@@ -12,6 +12,7 @@ import org.springframework.stereotype.Repository;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Collection;
+import java.util.List;
 
 @Repository
 public interface TransactionRepository extends JpaRepository<Transaction, Long> {
@@ -25,24 +26,27 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
             "LEFT JOIN FETCH t.toAccount ta " +
             "LEFT JOIN FETCH ta.user " +
             "WHERE (:id IS NULL OR t.initiatedBy = :id) " +
+            "AND (:ownerIbans IS NULL OR t.fromIban IN :ownerIbans OR t.toIban IN :ownerIbans) " +
             "AND (:type IS NULL OR t.type = :type) " +
             "AND (:iban IS NULL OR LOWER(t.fromIban) LIKE LOWER(CONCAT('%', :iban, '%')) " +
-            "OR LOWER(t.toIban) LIKE LOWER(CONCAT('%', :iban, '%'))) "+
+            "OR LOWER(t.toIban) LIKE LOWER(CONCAT('%', :iban, '%'))) " +
             "AND (:start IS NULL OR t.timestamp >= :start) " +
             "AND (:end IS NULL OR t.timestamp <= :end) " +
             "AND (:min IS NULL OR t.amount >= :min) " +
             "AND (:max IS NULL OR t.amount <= :max) ",
             countQuery = "SELECT count(t) FROM Transaction t " +
                     "WHERE (:id IS NULL OR t.initiatedBy = :id) " +
+                    "AND (:ownerIbans IS NULL OR t.fromIban IN :ownerIbans OR t.toIban IN :ownerIbans) " +
                     "AND (:type IS NULL OR t.type = :type) " +
                     "AND (:iban IS NULL OR LOWER(t.fromIban) LIKE LOWER(CONCAT('%', :iban, '%')) " +
                     "OR LOWER(t.toIban) LIKE LOWER(CONCAT('%', :iban, '%'))) " +
                     "AND (:start IS NULL OR t.timestamp >= :start) " +
                     "AND (:end IS NULL OR t.timestamp <= :end) " +
                     "AND (:min IS NULL OR t.amount >= :min) " +
-                    "AND (:max IS NULL OR t.amount <= :max) " )
+                    "AND (:max IS NULL OR t.amount <= :max) ")
     Page<Transaction> findAllFiltered(
             @Param("id") Long id,
+            @Param("ownerIbans") List<String> ownerIbans,
             @Param("type") TransactionType type,
             @Param("iban") String iban,
             @Param("start") LocalDateTime start,

@@ -35,10 +35,15 @@ public class TransactionController {
             @RequestParam(required = false) LocalDateTime end,
             @RequestParam(required = false) BigDecimal minAmount,
             @RequestParam(required = false) BigDecimal maxAmount,
-            @ParameterObject @PageableDefault(size = 5, sort = "timestamp", direction = Sort.Direction.DESC) Pageable pageable,
+            @ParameterObject @PageableDefault(size = 20, sort = "timestamp", direction = Sort.Direction.DESC) Pageable pageable,
             Authentication authentication) {
 
-        Page<TransactionResponseDTO> response = transactionService.findAll(initiatedBy, type, iban, start, end, minAmount, maxAmount, pageable, authentication);
+        String email = authentication.getName();
+        boolean isEmployee = authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_EMPLOYEE"));
+
+        Page<TransactionResponseDTO> response = transactionService.findAll(
+                initiatedBy, type, iban, start, end, minAmount, maxAmount, pageable, email, isEmployee);
 
         return ResponseEntity.ok(response);
     }

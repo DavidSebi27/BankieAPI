@@ -12,8 +12,6 @@ public interface TransactionMapper {
     @Mapping(target = "initiatedByName", ignore = true)
     TransactionResponseDTO toResponseDto(Transaction transaction);
 
-    @Mapping(target = "fromName", source = "fromName")
-    @Mapping(target = "toName", source = "toName")
     @Mapping(target = "initiatedBy", source = "transaction.initiatedBy")
     TransactionResponseDTO toResponseDto(Transaction transaction, String fromName, String toName);
 }

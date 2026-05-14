@@ -15,7 +15,6 @@ import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -38,19 +37,26 @@ public class TransactionService {
     public Page<TransactionResponseDTO> findAll(Long initiatedBy, TransactionType type, String iban,
                                                 LocalDateTime start, LocalDateTime end,
                                                 BigDecimal min, BigDecimal max,
-                                                Pageable pageable, Authentication auth) {
-        boolean isEmployee = auth.getAuthorities().stream()
-                .anyMatch(a -> a.getAuthority().equals("ROLE_EMPLOYEE"));
+                                                Pageable pageable, String email, boolean isEmployee) {
+        List<String> ownerIbans = null;
 
-        // If not employee, they can ONLY see their own transactions
         if (!isEmployee) {
-            User currentUser = userRepository.findByEmail(auth.getName())
+            User currentUser = userRepository.findByEmail(email)
                     .orElseThrow(() -> new EntityNotFoundException("User not found"));
 
-            initiatedBy = currentUser.getId();
+            ownerIbans = accountRepository.findByUser(currentUser).stream()
+                    .map(Account::getIban)
+                    .toList();
+
+            // Prevent a customer from filtering by an IBAN they don't own
+            if (iban != null && ownerIbans.stream().noneMatch(i -> i.equalsIgnoreCase(iban))) {
+                return Page.empty(pageable);
+            }
+
+            initiatedBy = null;
         }
 
-        Page<Transaction> transactions = transactionRepository.findAllFiltered(initiatedBy, type, iban, start, end, min, max, pageable);
+        Page<Transaction> transactions = transactionRepository.findAllFiltered(initiatedBy, ownerIbans, type, iban, start, end, min, max, pageable);
 
         return transactions.map(tx -> {
             // Extract names directly from the joined entities
