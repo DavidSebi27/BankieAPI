@@ -67,6 +67,7 @@ public class SecurityConfig {
                                 "/v3/api-docs/**", "/api-docs/**",
                                 "/h2-console/**")
                         .permitAll()
+                        .requestMatchers(HttpMethod.GET, "/transactions").authenticated()
                         .requestMatchers(HttpMethod.POST, "/transactions", "/transactions/withdraw", "/transactions/deposit")
                             .hasAnyRole("CUSTOMER", "EMPLOYEE")
                         .requestMatchers("/transactions/**", "/customers/**", "/users/**").hasRole("EMPLOYEE")

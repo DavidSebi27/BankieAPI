@@ -1,5 +1,6 @@
 package com.bankie.bankie_api.controller;
 
+import com.bankie.bankie_api.dto.PageResponse;
 import com.bankie.bankie_api.dto.response.UserResponseDTO;
 import com.bankie.bankie_api.entity.User;
 import com.bankie.bankie_api.mapper.UserMapper;
@@ -10,13 +11,11 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
-import com.bankie.bankie_api.dto.PageResponse;
-import org.springframework.data.domain.Page; // CORRECT IMPORT
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -31,19 +30,6 @@ public class UserController {
 
     private final UserService userService;
     private final UserMapper userMapper;
-
-    @GetMapping("/me")
-    @Operation(summary = "Get the authenticated user's profile")
-    @ApiResponses({
-            @ApiResponse(responseCode = "200", description = "Profile of the authenticated user."),
-            @ApiResponse(responseCode = "401", description = "Missing or invalid JWT token.")
-    })
-    public ResponseEntity<UserResponseDTO> getCurrentUser(Authentication authentication) {
-        String email = authentication.getName();
-
-        User user = userService.findByEmail(email);
-        return ResponseEntity.ok(userMapper.toResponseDto(user));
-    }
 
     @GetMapping
     @PreAuthorize("hasRole('EMPLOYEE')") // Restrict to employees as per spec

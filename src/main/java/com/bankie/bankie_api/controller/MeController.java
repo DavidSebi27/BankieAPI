@@ -28,15 +28,13 @@ public class MeController {
 
     @GetMapping
     public UserResponseDTO myProfile(@AuthenticationPrincipal String email) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new EntityNotFoundException("User not found"));
+        User user = userRepository.findByEmail(email).orElseThrow(() -> new EntityNotFoundException("User not found"));
         return userMapper.toResponseDto(user);
     }
 
     @GetMapping("/accounts")
     public List<AccountResponseDTO> myAccounts(@AuthenticationPrincipal String email) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new EntityNotFoundException("User not found"));
+        User user = userRepository.findByEmail(email).orElseThrow(() -> new EntityNotFoundException("User not found"));
         return accountRepository.findByUser(user).stream()
                 .map(accountMapper::toResponseDto)
                 .toList();
