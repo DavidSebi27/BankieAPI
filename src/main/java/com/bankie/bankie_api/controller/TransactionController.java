@@ -1,5 +1,6 @@
 package com.bankie.bankie_api.controller;
 
+import com.bankie.bankie_api.dto.request.AtmRequestDTO;
 import com.bankie.bankie_api.dto.request.TransferRequestDTO;
 import com.bankie.bankie_api.dto.response.TransactionResponseDTO;
 import com.bankie.bankie_api.service.TransactionService;
@@ -36,5 +37,19 @@ public class TransactionController {
     public TransactionResponseDTO transfer(@Valid @RequestBody TransferRequestDTO request,
                                            @AuthenticationPrincipal String initiatorEmail) {
         return transactionService.transfer(request, initiatorEmail);
+    }
+
+    @PostMapping("/withdraw")
+    @ResponseStatus(HttpStatus.CREATED)
+    public TransactionResponseDTO withdraw(@Valid @RequestBody AtmRequestDTO request,
+                                           @AuthenticationPrincipal String initiatorEmail) {
+        return transactionService.withdraw(request, initiatorEmail);
+    }
+
+    @PostMapping("/deposit")
+    @ResponseStatus(HttpStatus.CREATED)
+    public TransactionResponseDTO deposit(@Valid @RequestBody AtmRequestDTO request,
+                                          @AuthenticationPrincipal String initiatorEmail) {
+        return transactionService.deposit(request, initiatorEmail);
     }
 }

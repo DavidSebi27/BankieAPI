@@ -1,5 +1,6 @@
 package com.bankie.bankie_api.service;
 
+import com.bankie.bankie_api.dto.request.AtmRequestDTO;
 import com.bankie.bankie_api.dto.request.TransferRequestDTO;
 import com.bankie.bankie_api.dto.response.TransactionResponseDTO;
 import com.bankie.bankie_api.entity.Account;
@@ -80,7 +81,7 @@ class TransactionServiceTest {
     void transfer_happyPath_debitsSourceCreditsDestinationAndPersistsTransaction() {
         when(accountRepository.findById(FROM)).thenReturn(Optional.of(source));
         when(accountRepository.findById(TO)).thenReturn(Optional.of(destination));
-        when(transactionRepository.sumOutgoingSince(eq(FROM), eq(TransactionType.TRANSFER), any()))
+        when(transactionRepository.sumDailyMovementsSince(eq(FROM), any()))
                 .thenReturn(BigDecimal.ZERO);
         when(userRepository.findByEmail(EMPLOYEE_EMAIL)).thenReturn(Optional.of(employee));
         when(transactionRepository.save(any(Transaction.class))).thenAnswer(inv -> {
@@ -203,12 +204,129 @@ class TransactionServiceTest {
         source.setDailyTransferLimit(new BigDecimal("200.00"));
         when(accountRepository.findById(FROM)).thenReturn(Optional.of(source));
         when(accountRepository.findById(TO)).thenReturn(Optional.of(destination));
-        when(transactionRepository.sumOutgoingSince(eq(FROM), eq(TransactionType.TRANSFER), any(LocalDateTime.class)))
+        when(transactionRepository.sumDailyMovementsSince(eq(FROM), any(LocalDateTime.class)))
                 .thenReturn(new BigDecimal("150.00"));
 
         assertThatThrownBy(() -> service.transfer(request(new BigDecimal("100.00")), EMPLOYEE_EMAIL))
                 .isInstanceOf(BusinessRuleException.class)
                 .hasMessageContaining("daily transfer limit");
+
+        verify(transactionRepository, never()).save(any());
+    }
+
+    private AtmRequestDTO atm(String iban, BigDecimal amount) {
+        return new AtmRequestDTO(iban, amount);
+    }
+
+    @Test
+    void withdraw_happyPath_debitsBalanceAndPersistsWithdrawal() {
+        when(accountRepository.findById(FROM)).thenReturn(Optional.of(source));
+        when(transactionRepository.sumDailyMovementsSince(eq(FROM), any())).thenReturn(BigDecimal.ZERO);
+        when(userRepository.findByEmail(EMPLOYEE_EMAIL)).thenReturn(Optional.of(employee));
+        when(transactionRepository.save(any(Transaction.class))).thenAnswer(inv -> {
+            Transaction t = inv.getArgument(0);
+            t.setId(1L);
+            return t;
+        });
+        when(transactionMapper.toResponseDto(any(Transaction.class)))
+                .thenReturn(TransactionResponseDTO.builder().id(1L).type(TransactionType.WITHDRAWAL).build());
+
+        service.withdraw(atm(FROM, new BigDecimal("100.00")), EMPLOYEE_EMAIL);
+
+        assertThat(source.getBalance()).isEqualByComparingTo("400.00");
+
+        ArgumentCaptor<Transaction> txCaptor = ArgumentCaptor.forClass(Transaction.class);
+        verify(transactionRepository).save(txCaptor.capture());
+        Transaction saved = txCaptor.getValue();
+        assertThat(saved.getType()).isEqualTo(TransactionType.WITHDRAWAL);
+        assertThat(saved.getFromIban()).isEqualTo(FROM);
+        assertThat(saved.getToIban()).isNull();
+        assertThat(saved.getAmount()).isEqualByComparingTo("100.00");
+    }
+
+    @Test
+    void withdraw_rejectsWhenBalanceWouldBreachAbsoluteLimit() {
+        source.setBalance(new BigDecimal("50.00"));
+        when(accountRepository.findById(FROM)).thenReturn(Optional.of(source));
+
+        assertThatThrownBy(() -> service.withdraw(atm(FROM, new BigDecimal("100.00")), EMPLOYEE_EMAIL))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("absolute limit");
+
+        verify(transactionRepository, never()).save(any());
+    }
+
+    @Test
+    void withdraw_rejectsWhenAmountExceedsDailyLimit() {
+        source.setDailyTransferLimit(new BigDecimal("200.00"));
+        when(accountRepository.findById(FROM)).thenReturn(Optional.of(source));
+        when(transactionRepository.sumDailyMovementsSince(eq(FROM), any()))
+                .thenReturn(new BigDecimal("150.00"));
+
+        assertThatThrownBy(() -> service.withdraw(atm(FROM, new BigDecimal("100.00")), EMPLOYEE_EMAIL))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("daily transfer limit");
+
+        verify(transactionRepository, never()).save(any());
+    }
+
+    @Test
+    void withdraw_rejectsWhenAccountMissing() {
+        when(accountRepository.findById(FROM)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> service.withdraw(atm(FROM, new BigDecimal("10.00")), EMPLOYEE_EMAIL))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("Account not found");
+    }
+
+    @Test
+    void deposit_happyPath_creditsBalanceAndPersistsDeposit() {
+        when(accountRepository.findById(FROM)).thenReturn(Optional.of(source));
+        when(transactionRepository.sumDailyMovementsSince(eq(FROM), any())).thenReturn(BigDecimal.ZERO);
+        when(userRepository.findByEmail(EMPLOYEE_EMAIL)).thenReturn(Optional.of(employee));
+        when(transactionRepository.save(any(Transaction.class))).thenAnswer(inv -> {
+            Transaction t = inv.getArgument(0);
+            t.setId(2L);
+            return t;
+        });
+        when(transactionMapper.toResponseDto(any(Transaction.class)))
+                .thenReturn(TransactionResponseDTO.builder().id(2L).type(TransactionType.DEPOSIT).build());
+
+        service.deposit(atm(FROM, new BigDecimal("75.00")), EMPLOYEE_EMAIL);
+
+        assertThat(source.getBalance()).isEqualByComparingTo("575.00");
+
+        ArgumentCaptor<Transaction> txCaptor = ArgumentCaptor.forClass(Transaction.class);
+        verify(transactionRepository).save(txCaptor.capture());
+        Transaction saved = txCaptor.getValue();
+        assertThat(saved.getType()).isEqualTo(TransactionType.DEPOSIT);
+        assertThat(saved.getFromIban()).isNull();
+        assertThat(saved.getToIban()).isEqualTo(FROM);
+        assertThat(saved.getAmount()).isEqualByComparingTo("75.00");
+    }
+
+    @Test
+    void deposit_rejectsWhenAmountExceedsDailyLimit() {
+        source.setDailyTransferLimit(new BigDecimal("200.00"));
+        when(accountRepository.findById(FROM)).thenReturn(Optional.of(source));
+        when(transactionRepository.sumDailyMovementsSince(eq(FROM), any()))
+                .thenReturn(new BigDecimal("150.00"));
+
+        assertThatThrownBy(() -> service.deposit(atm(FROM, new BigDecimal("100.00")), EMPLOYEE_EMAIL))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("daily transfer limit");
+
+        verify(transactionRepository, never()).save(any());
+    }
+
+    @Test
+    void deposit_rejectsWhenAccountIsSavings() {
+        source.setType(AccountType.SAVINGS);
+        when(accountRepository.findById(FROM)).thenReturn(Optional.of(source));
+
+        assertThatThrownBy(() -> service.deposit(atm(FROM, new BigDecimal("50.00")), EMPLOYEE_EMAIL))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("checking");
 
         verify(transactionRepository, never()).save(any());
     }

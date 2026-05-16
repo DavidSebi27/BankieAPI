@@ -1,5 +1,6 @@
 package com.bankie.bankie_api.service;
 
+import com.bankie.bankie_api.dto.request.AtmRequestDTO;
 import com.bankie.bankie_api.dto.request.TransferRequestDTO;
 import com.bankie.bankie_api.dto.response.TransactionResponseDTO;
 import com.bankie.bankie_api.entity.Account;
@@ -81,15 +82,9 @@ public class TransactionService {
             throw new BusinessRuleException("Transfer would breach the source account's absolute limit");
         }
 
-        LocalDateTime startOfDay = LocalDate.now().atStartOfDay();
-        BigDecimal alreadySentToday = transactionRepository.sumOutgoingSince(
-                source.getIban(), TransactionType.TRANSFER, startOfDay);
-        if (alreadySentToday.add(amount).compareTo(source.getDailyTransferLimit()) > 0) {
-            throw new BusinessRuleException("Transfer exceeds the source account's daily transfer limit");
-        }
+        enforceDailyLimit(source, amount, "Transfer");
 
-        User initiator = userRepository.findByEmail(initiatorEmail)
-                .orElseThrow(() -> new BusinessRuleException("Initiator not found"));
+        User initiator = resolveInitiator(initiatorEmail);
 
         source.setBalance(newBalance);
         destination.setBalance(destination.getBalance().add(amount));
@@ -106,6 +101,77 @@ public class TransactionService {
                 .initiatedBy(initiator.getId())
                 .build());
 
+        return toDto(tx, initiator);
+    }
+
+    @Transactional
+    public TransactionResponseDTO withdraw(AtmRequestDTO request, String initiatorEmail) {
+        Account account = accountRepository.findById(request.getIban())
+                .orElseThrow(() -> new BusinessRuleException("Account not found"));
+        requireActiveCustomerChecking(account, "Account");
+
+        BigDecimal amount = request.getAmount();
+        BigDecimal newBalance = account.getBalance().subtract(amount);
+        if (newBalance.compareTo(account.getAbsoluteLimit()) < 0) {
+            throw new BusinessRuleException("Withdrawal would breach the account's absolute limit");
+        }
+        enforceDailyLimit(account, amount, "Withdrawal");
+
+        User initiator = resolveInitiator(initiatorEmail);
+        account.setBalance(newBalance);
+        accountRepository.save(account);
+
+        Transaction tx = transactionRepository.save(Transaction.builder()
+                .type(TransactionType.WITHDRAWAL)
+                .fromIban(account.getIban())
+                .amount(amount)
+                .currency(account.getCurrency())
+                .timestamp(LocalDateTime.now())
+                .initiatedBy(initiator.getId())
+                .build());
+
+        return toDto(tx, initiator);
+    }
+
+    @Transactional
+    public TransactionResponseDTO deposit(AtmRequestDTO request, String initiatorEmail) {
+        Account account = accountRepository.findById(request.getIban())
+                .orElseThrow(() -> new BusinessRuleException("Account not found"));
+        requireActiveCustomerChecking(account, "Account");
+
+        BigDecimal amount = request.getAmount();
+        enforceDailyLimit(account, amount, "Deposit");
+
+        User initiator = resolveInitiator(initiatorEmail);
+        account.setBalance(account.getBalance().add(amount));
+        accountRepository.save(account);
+
+        Transaction tx = transactionRepository.save(Transaction.builder()
+                .type(TransactionType.DEPOSIT)
+                .toIban(account.getIban())
+                .amount(amount)
+                .currency(account.getCurrency())
+                .timestamp(LocalDateTime.now())
+                .initiatedBy(initiator.getId())
+                .build());
+
+        return toDto(tx, initiator);
+    }
+
+    private void enforceDailyLimit(Account account, BigDecimal amount, String label) {
+        LocalDateTime startOfDay = LocalDate.now().atStartOfDay();
+        BigDecimal usedToday = transactionRepository.sumDailyMovementsSince(account.getIban(), startOfDay);
+        if (usedToday.add(amount).compareTo(account.getDailyTransferLimit()) > 0) {
+            throw new BusinessRuleException(label + " exceeds the account's daily transfer limit");
+        }
+    }
+
+    private User resolveInitiator(String email) {
+        return userRepository.findByEmail(email)
+                .orElseThrow(() -> new BusinessRuleException("Initiator not found"));
+    }
+
+    private TransactionResponseDTO toDto(Transaction tx, User initiator) {
         TransactionResponseDTO dto = transactionMapper.toResponseDto(tx);
         dto.setInitiatedByName(initiator.getFirstName() + " " + initiator.getLastName());
         return dto;
