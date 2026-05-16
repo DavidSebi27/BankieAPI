@@ -104,8 +104,27 @@ public class TransactionService {
         Account destination = accountRepository.findById(request.getToIban())
                 .orElseThrow(() -> new BusinessRuleException("Destination account not found"));
 
-        requireActiveCustomerChecking(source, "Source");
-        requireActiveCustomerChecking(destination, "Destination");
+        User initiator = resolveInitiator(initiatorEmail);
+
+        boolean isEmployee = initiator.getRole() == Role.EMPLOYEE;
+        if (!isEmployee && (source.getUser() == null || !source.getUser().getId().equals(initiator.getId()))) {
+            throw new BusinessRuleException("You do not own the source account");
+        }
+
+        requireActiveCustomerOwned(source, "Source");
+        requireActiveCustomerOwned(destination, "Destination");
+
+        Long sourceOwnerId = source.getUser() != null ? source.getUser().getId() : null;
+        Long destOwnerId = destination.getUser() != null ? destination.getUser().getId() : null;
+        boolean isExternal = sourceOwnerId == null || destOwnerId == null || !sourceOwnerId.equals(destOwnerId);
+        if (isExternal) {
+            if (source.getType() != AccountType.CHECKING) {
+                throw new BusinessRuleException("External transfers must originate from a checking account");
+            }
+            if (destination.getType() != AccountType.CHECKING) {
+                throw new BusinessRuleException("External transfers must go to a checking account");
+            }
+        }
 
         if (!Objects.equals(source.getCurrency(), destination.getCurrency())) {
             throw new BusinessRuleException("Accounts must share the same currency");
@@ -118,8 +137,6 @@ public class TransactionService {
         }
 
         enforceDailyLimit(source, amount, "Transfer");
-
-        User initiator = resolveInitiator(initiatorEmail);
 
         source.setBalance(newBalance);
         destination.setBalance(destination.getBalance().add(amount));
@@ -216,6 +233,10 @@ public class TransactionService {
         if (account.getType() != AccountType.CHECKING) {
             throw new BusinessRuleException(label + " account must be a checking account");
         }
+        requireActiveCustomerOwned(account, label);
+    }
+
+    private void requireActiveCustomerOwned(Account account, String label) {
         if (account.getStatus() != AccountStatus.ACTIVE) {
             throw new BusinessRuleException(label + " account is not active");
         }
