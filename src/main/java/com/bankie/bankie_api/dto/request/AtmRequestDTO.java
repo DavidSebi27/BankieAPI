@@ -13,15 +13,11 @@ import java.math.BigDecimal;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class TransferRequestDTO {
+public class AtmRequestDTO {
 
     @NotBlank
     @Pattern(regexp = "[A-Z]{2}\\d{2}[A-Z0-9]{1,30}", message = "Invalid IBAN format")
-    private String fromIban;
-
-    @NotBlank
-    @Pattern(regexp = "[A-Z]{2}\\d{2}[A-Z0-9]{1,30}", message = "Invalid IBAN format")
-    private String toIban;
+    private String iban;
 
     @NotNull
     @DecimalMin(value = "0.01", message = "Amount must be greater than zero")

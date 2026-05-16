@@ -68,7 +68,9 @@ public class SecurityConfig {
                                 "/h2-console/**")
                         .permitAll()
                         .requestMatchers(HttpMethod.GET, "/transactions").authenticated()
-                        .requestMatchers("/transactions/**","/customers/**", "/users/**").hasRole("EMPLOYEE")
+                        .requestMatchers(HttpMethod.POST, "/transactions", "/transactions/withdraw", "/transactions/deposit")
+                            .hasAnyRole("CUSTOMER", "EMPLOYEE")
+                        .requestMatchers("/transactions/**", "/customers/**", "/users/**").hasRole("EMPLOYEE")
                         .anyRequest().authenticated())
                 .exceptionHandling(eh -> eh
                         .authenticationEntryPoint((req, res, ex) -> writeNotFound(res, objectMapper))
