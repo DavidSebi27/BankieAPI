@@ -1,10 +1,14 @@
 package com.bankie.bankie_api.service;
 
+import com.bankie.bankie_api.dto.request.TransferRequestDTO;
 import com.bankie.bankie_api.dto.response.TransactionResponseDTO;
 import com.bankie.bankie_api.entity.Account;
 import com.bankie.bankie_api.entity.Transaction;
 import com.bankie.bankie_api.entity.User;
+import com.bankie.bankie_api.enums.AccountStatus;
+import com.bankie.bankie_api.enums.AccountType;
 import com.bankie.bankie_api.enums.Role;
+import com.bankie.bankie_api.exception.BusinessRuleException;
 import com.bankie.bankie_api.exception.CustomerNotFoundException;
 import com.bankie.bankie_api.enums.TransactionType;
 import com.bankie.bankie_api.mapper.TransactionMapper;
@@ -15,7 +19,9 @@ import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
@@ -23,6 +29,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Service
@@ -48,12 +55,12 @@ public class TransactionService {
                     .map(Account::getIban)
                     .toList();
 
+            if (ownerIbans.isEmpty()) return Page.empty(pageable);
+
             // Prevent a customer from filtering by an IBAN they don't own
             if (iban != null && ownerIbans.stream().noneMatch(i -> i.equalsIgnoreCase(iban))) {
                 return Page.empty(pageable);
             }
-
-            initiatedBy = null;
         }
 
         Page<Transaction> transactions = transactionRepository.findAllFiltered(initiatedBy, ownerIbans, type, iban, start, end, min, max, pageable);
@@ -70,6 +77,71 @@ public class TransactionService {
 
             return transactionMapper.toResponseDto(tx, fromName, toName);
         });
+    }
+
+    @Transactional
+    public TransactionResponseDTO transfer(TransferRequestDTO req, Authentication auth) {
+        if (req.getFromIban().equals(req.getToIban())) {
+            throw new BusinessRuleException("Cannot transfer to the same account");
+        }
+
+        Account fromAccount = accountRepository.findById(req.getFromIban())
+                .orElseThrow(() -> new EntityNotFoundException("Source account not found"));
+        Account toAccount = accountRepository.findById(req.getToIban())
+                .orElseThrow(() -> new EntityNotFoundException("Destination account not found"));
+
+        User currentUser = userRepository.findByEmail(auth.getName())
+                .orElseThrow(() -> new EntityNotFoundException("User not found"));
+
+        if (!fromAccount.getUser().getId().equals(currentUser.getId())) {
+            throw new BusinessRuleException("You do not own this account");
+        }
+        if (fromAccount.getStatus() != AccountStatus.ACTIVE) {
+            throw new BusinessRuleException("Source account is not active");
+        }
+        if (toAccount.getStatus() != AccountStatus.ACTIVE) {
+            throw new BusinessRuleException("Destination account is not active");
+        }
+
+        boolean isExternal = !toAccount.getUser().getId().equals(currentUser.getId());
+        if (isExternal) {
+            if (fromAccount.getType() != AccountType.CHECKING) {
+                throw new BusinessRuleException("External transfers must originate from a checking account");
+            }
+            if (toAccount.getType() != AccountType.CHECKING) {
+                throw new BusinessRuleException("External transfers must go to a checking account");
+            }
+        }
+
+        BigDecimal amount = req.getAmount();
+        if (fromAccount.getBalance().subtract(amount).compareTo(fromAccount.getAbsoluteLimit()) < 0) {
+            throw new BusinessRuleException("Transfer would breach the absolute limit");
+        }
+
+        LocalDateTime startOfToday = LocalDate.now().atStartOfDay();
+        BigDecimal alreadySentToday = transactionRepository.sumTodayOutgoing(req.getFromIban(), startOfToday);
+        if (alreadySentToday.add(amount).compareTo(fromAccount.getDailyTransferLimit()) > 0) {
+            throw new BusinessRuleException("Daily transfer limit exceeded");
+        }
+
+        fromAccount.setBalance(fromAccount.getBalance().subtract(amount));
+        toAccount.setBalance(toAccount.getBalance().add(amount));
+        accountRepository.save(fromAccount);
+        accountRepository.save(toAccount);
+
+        Transaction tx = Transaction.builder()
+                .type(TransactionType.TRANSFER)
+                .fromIban(req.getFromIban())
+                .toIban(req.getToIban())
+                .amount(amount)
+                .timestamp(LocalDateTime.now())
+                .initiatedBy(currentUser.getId())
+                .build();
+        tx = transactionRepository.save(tx);
+
+        String fromName = fromAccount.getUser().getFirstName() + " " + fromAccount.getUser().getLastName();
+        String toName = toAccount.getUser().getFirstName() + " " + toAccount.getUser().getLastName();
+        return transactionMapper.toResponseDto(tx, fromName, toName);
     }
 
     public Page<TransactionResponseDTO> findByCustomer(Long customerId, Pageable pageable) {

@@ -67,8 +67,7 @@ public class SecurityConfig {
                                 "/v3/api-docs/**", "/api-docs/**",
                                 "/h2-console/**")
                         .permitAll()
-                        .requestMatchers(HttpMethod.GET, "/transactions").authenticated()
-                        .requestMatchers("/transactions/**","/customers/**", "/users/**").hasRole("EMPLOYEE")
+                        .requestMatchers("/customers/**", "/users/**").hasRole("EMPLOYEE")
                         .anyRequest().authenticated())
                 .exceptionHandling(eh -> eh
                         .authenticationEntryPoint((req, res, ex) -> writeNotFound(res, objectMapper))

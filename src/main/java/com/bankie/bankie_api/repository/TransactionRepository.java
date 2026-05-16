@@ -54,4 +54,7 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
             @Param("min") BigDecimal min,
             @Param("max") BigDecimal max,
             Pageable pageable);
+
+    @Query("SELECT COALESCE(SUM(t.amount), 0) FROM Transaction t WHERE t.fromIban = :iban AND t.timestamp >= :startOfDay")
+    BigDecimal sumTodayOutgoing(@Param("iban") String iban, @Param("startOfDay") LocalDateTime startOfDay);
 }
