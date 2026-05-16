@@ -6,10 +6,12 @@ import com.bankie.bankie_api.entity.Transaction;
 import com.bankie.bankie_api.entity.User;
 import com.bankie.bankie_api.enums.Role;
 import com.bankie.bankie_api.exception.CustomerNotFoundException;
+import com.bankie.bankie_api.enums.TransactionType;
 import com.bankie.bankie_api.mapper.TransactionMapper;
 import com.bankie.bankie_api.repository.AccountRepository;
 import com.bankie.bankie_api.repository.TransactionRepository;
 import com.bankie.bankie_api.repository.UserRepository;
+import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -20,6 +22,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 
 @Service
 @RequiredArgsConstructor
@@ -30,8 +34,42 @@ public class TransactionService {
     private final AccountRepository accountRepository;
     private final TransactionMapper transactionMapper;
 
-    public Page<TransactionResponseDTO> findAll(Pageable pageable) {
-        return mapWithNames(transactionRepository.findAll(pageable));
+    public Page<TransactionResponseDTO> findAll(Long initiatedBy, TransactionType type, String iban,
+                                                LocalDateTime start, LocalDateTime end,
+                                                BigDecimal min, BigDecimal max,
+                                                Pageable pageable, String email, boolean isEmployee) {
+        List<String> ownerIbans = null;
+
+        if (!isEmployee) {
+            User currentUser = userRepository.findByEmail(email)
+                    .orElseThrow(() -> new EntityNotFoundException("User not found"));
+
+            ownerIbans = accountRepository.findByUser(currentUser).stream()
+                    .map(Account::getIban)
+                    .toList();
+
+            // Prevent a customer from filtering by an IBAN they don't own
+            if (iban != null && ownerIbans.stream().noneMatch(i -> i.equalsIgnoreCase(iban))) {
+                return Page.empty(pageable);
+            }
+
+            initiatedBy = null;
+        }
+
+        Page<Transaction> transactions = transactionRepository.findAllFiltered(initiatedBy, ownerIbans, type, iban, start, end, min, max, pageable);
+
+        return transactions.map(tx -> {
+            // Extract names directly from the joined entities
+            String fromName = (tx.getFromAccount() != null)
+                    ? tx.getFromAccount().getUser().getFirstName() + " " + tx.getFromAccount().getUser().getLastName()
+                    : "External/ATM";
+
+            String toName = (tx.getToAccount() != null)
+                    ? tx.getToAccount().getUser().getFirstName() + " " + tx.getToAccount().getUser().getLastName()
+                    : "External/ATM";
+
+            return transactionMapper.toResponseDto(tx, fromName, toName);
+        });
     }
 
     public Page<TransactionResponseDTO> findByCustomer(Long customerId, Pageable pageable) {
