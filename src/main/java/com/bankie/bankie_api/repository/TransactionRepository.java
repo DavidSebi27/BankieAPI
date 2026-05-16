@@ -20,6 +20,12 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
     @Query("SELECT t FROM Transaction t WHERE t.fromIban IN :ibans OR t.toIban IN :ibans")
     Page<Transaction> findByIbanIn(@Param("ibans") Collection<String> ibans, Pageable pageable);
 
+    @Query("SELECT COALESCE(SUM(t.amount), 0) FROM Transaction t WHERE t.timestamp >= :since AND (" +
+            "(t.fromIban = :iban AND t.type IN (com.bankie.bankie_api.enums.TransactionType.TRANSFER, com.bankie.bankie_api.enums.TransactionType.WITHDRAWAL)) OR " +
+            "(t.toIban = :iban AND t.type = com.bankie.bankie_api.enums.TransactionType.DEPOSIT))")
+    BigDecimal sumDailyMovementsSince(@Param("iban") String iban,
+                                      @Param("since") LocalDateTime since);
+
     @Query(value = "SELECT t FROM Transaction t " +
             "LEFT JOIN FETCH t.fromAccount fa " +
             "LEFT JOIN FETCH fa.user " +
@@ -54,7 +60,4 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
             @Param("min") BigDecimal min,
             @Param("max") BigDecimal max,
             Pageable pageable);
-
-    @Query("SELECT COALESCE(SUM(t.amount), 0) FROM Transaction t WHERE t.fromIban = :iban AND t.timestamp >= :startOfDay")
-    BigDecimal sumTodayOutgoing(@Param("iban") String iban, @Param("startOfDay") LocalDateTime startOfDay);
 }
