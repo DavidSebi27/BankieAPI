@@ -5,7 +5,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-import java.util.Random;
+import java.util.concurrent.ThreadLocalRandom;
 
 @Component
 @RequiredArgsConstructor
@@ -15,7 +15,6 @@ public class IbanGenerator {
     private String bankCode;
 
     private final AccountRepository accountRepository;
-    private final Random random = new Random();
 
     public String generate() {
         String iban;
@@ -26,10 +25,10 @@ public class IbanGenerator {
     }
 
     private String twoDigits() {
-        return String.format("%02d", random.nextInt(100));
+        return String.format("%02d", ThreadLocalRandom.current().nextInt(100));
     }
 
     private String nineDigits() {
-        return String.format("%09d", random.nextInt(1_000_000_000));
+        return String.format("%09d", ThreadLocalRandom.current().nextInt(1_000_000_000));
     }
 }

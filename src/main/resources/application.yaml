@@ -29,3 +29,5 @@ springdoc:
 bankie:
   iban:
     bank-code: INHO0
+  account:
+    default-daily-limit: 1000.00

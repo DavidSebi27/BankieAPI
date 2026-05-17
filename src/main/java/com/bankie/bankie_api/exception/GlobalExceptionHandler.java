@@ -49,4 +49,9 @@ public class GlobalExceptionHandler {
     private static ResponseEntity<ErrorResponse> status(HttpStatus status, String message) {
         return ResponseEntity.status(status).body(ErrorResponse.of(status, message));
     }
+
+    @ExceptionHandler(AccountNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleAccountNotFound(AccountNotFoundException ex) {
+        return status(HttpStatus.NOT_FOUND, ex.getMessage());
+    }
 }

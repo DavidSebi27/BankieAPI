@@ -1,8 +1,8 @@
 package com.bankie.bankie_api.controller;
 
 import com.bankie.bankie_api.dto.PageResponse;
-import com.bankie.bankie_api.dto.request.CreateAccountRequestDTO;
-import com.bankie.bankie_api.dto.request.UpdateLimitsRequestDTO;
+import com.bankie.bankie_api.dto.request.SetAbsoluteLimitRequestDTO;
+import com.bankie.bankie_api.dto.request.SetDailyLimitRequestDTO;
 import com.bankie.bankie_api.dto.response.AccountResponseDTO;
 import com.bankie.bankie_api.dto.response.SearchAccountResponseDTO;
 import com.bankie.bankie_api.dto.response.UserResponseDTO;
@@ -62,14 +62,13 @@ public class AccountController {
         return ResponseEntity.ok(PageResponse.from(users.map(userMapper::toResponseDto)));
     }
 
-    @PostMapping("/customers/{customerId}/approve")
+    @GetMapping("/customers/{customerId}/accounts")
     @PreAuthorize("hasRole('EMPLOYEE')")
-    public ResponseEntity<List<AccountResponseDTO>> approveCustomer(
+    public ResponseEntity<Page<AccountResponseDTO>> getAccountsByCustomer(
             @PathVariable Long customerId,
-            @RequestBody CreateAccountRequestDTO dto) {
-        List<Account> accounts = accountService.approveCustomerAndCreateAccounts(customerId, dto);
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(accounts.stream().map(accountMapper::toResponseDto).toList());
+            @PageableDefault(size = 20) Pageable pageable) {
+        Page<Account> accounts = accountService.getAccountsByCustomer(customerId, pageable);
+        return ResponseEntity.ok(accounts.map(accountMapper::toResponseDto));
     }
 
     @PatchMapping("/{iban}/close")
@@ -82,7 +81,7 @@ public class AccountController {
     @PreAuthorize("hasRole('EMPLOYEE')")
     public ResponseEntity<AccountResponseDTO> updateAbsoluteLimit(
             @PathVariable String iban,
-            @RequestBody UpdateLimitsRequestDTO dto) {
+            @RequestBody SetAbsoluteLimitRequestDTO dto) {
         return ResponseEntity.ok(accountMapper.toResponseDto(accountService.updateAbsoluteLimit(iban, dto)));
     }
 
@@ -90,7 +89,7 @@ public class AccountController {
     @PreAuthorize("hasRole('EMPLOYEE')")
     public ResponseEntity<AccountResponseDTO> updateDailyLimit(
             @PathVariable String iban,
-            @RequestBody UpdateLimitsRequestDTO dto) {
+            @RequestBody SetDailyLimitRequestDTO dto) {
         return ResponseEntity.ok(accountMapper.toResponseDto(accountService.updateDailyTransferLimit(iban, dto)));
     }
 }

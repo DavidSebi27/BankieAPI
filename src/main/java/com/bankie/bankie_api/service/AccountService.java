@@ -1,12 +1,14 @@
 package com.bankie.bankie_api.service;
 
 import com.bankie.bankie_api.dto.request.CreateAccountRequestDTO;
-import com.bankie.bankie_api.dto.request.UpdateLimitsRequestDTO;
+import com.bankie.bankie_api.dto.request.SetAbsoluteLimitRequestDTO;
+import com.bankie.bankie_api.dto.request.SetDailyLimitRequestDTO;
 import com.bankie.bankie_api.entity.Account;
 import com.bankie.bankie_api.entity.User;
 import com.bankie.bankie_api.enums.AccountStatus;
 import com.bankie.bankie_api.enums.AccountType;
 import com.bankie.bankie_api.enums.Role;
+import com.bankie.bankie_api.exception.AccountNotFoundException;
 import com.bankie.bankie_api.exception.BusinessRuleException;
 import com.bankie.bankie_api.exception.CustomerNotFoundException;
 import com.bankie.bankie_api.repository.AccountRepository;
@@ -14,6 +16,7 @@ import com.bankie.bankie_api.repository.UserRepository;
 import com.bankie.bankie_api.util.IbanGenerator;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.Authentication;
@@ -26,9 +29,13 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 public class AccountService {
+
     private final AccountRepository accountRepository;
     private final UserRepository userRepository;
     private final IbanGenerator ibanGenerator;
+
+    @Value("${bankie.account.default-daily-limit}")
+    private BigDecimal defaultDailyLimit;
 
     public Page<Account> getAccountsForUser(Authentication auth, Pageable pageable) {
         boolean isEmployee = auth.getAuthorities().stream()
@@ -65,20 +72,34 @@ public class AccountService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new CustomerNotFoundException(userId));
 
-        if (!accountRepository.findByUser(user).isEmpty()) {
+        if (user.getRole() != Role.CUSTOMER) {
+            throw new BusinessRuleException("Only customers can be approved");
+        }
+
+        if (accountRepository.existsByUser(user)) {
             throw new BusinessRuleException("Customer already has accounts");
+        }
+
+        if (dto.getAbsoluteLimit() != null && dto.getAbsoluteLimit().compareTo(BigDecimal.ZERO) > 0) {
+            throw new BusinessRuleException("Absolute limit cannot be positive");
+        }
+        if (dto.getDailyTransferLimit() != null && dto.getDailyTransferLimit().compareTo(BigDecimal.ZERO) < 0) {
+            throw new BusinessRuleException("Daily transfer limit cannot be negative");
         }
 
         user.setApproved(true);
         userRepository.save(user);
+
+        BigDecimal absoluteLimit = dto.getAbsoluteLimit() != null ? dto.getAbsoluteLimit() : BigDecimal.ZERO;
+        BigDecimal dailyLimit = dto.getDailyTransferLimit() != null ? dto.getDailyTransferLimit() : defaultDailyLimit;
 
         Account checking = Account.builder()
                 .iban(ibanGenerator.generate())
                 .type(AccountType.CHECKING)
                 .balance(BigDecimal.ZERO)
                 .status(AccountStatus.ACTIVE)
-                .absoluteLimit(dto.getAbsoluteLimit() != null ? dto.getAbsoluteLimit() : BigDecimal.ZERO)
-                .dailyTransferLimit(dto.getDailyTransferLimit() != null ? dto.getDailyTransferLimit() : new BigDecimal("1000.00"))
+                .absoluteLimit(absoluteLimit)
+                .dailyTransferLimit(dailyLimit)
                 .user(user)
                 .build();
 
@@ -88,7 +109,7 @@ public class AccountService {
                 .balance(BigDecimal.ZERO)
                 .status(AccountStatus.ACTIVE)
                 .absoluteLimit(BigDecimal.ZERO)
-                .dailyTransferLimit(dto.getDailyTransferLimit() != null ? dto.getDailyTransferLimit() : new BigDecimal("1000.00"))
+                .dailyTransferLimit(dailyLimit)
                 .user(user)
                 .build();
 
@@ -101,30 +122,32 @@ public class AccountService {
     @Transactional
     public Account closeAccount(String iban) {
         Account account = accountRepository.findById(iban)
-                .orElseThrow(() -> new EntityNotFoundException("Account not found: " + iban));
-        if (account.getStatus() == AccountStatus.CLOSED)
+                .orElseThrow(() -> new AccountNotFoundException(iban));
+        if (account.getStatus() == AccountStatus.CLOSED) {
             throw new BusinessRuleException("Account is already closed");
-        if (account.getBalance().compareTo(BigDecimal.ZERO) != 0)
-            throw new BusinessRuleException("Account balance must be 0 before closing");
+        }
         account.setStatus(AccountStatus.CLOSED);
         return accountRepository.save(account);
     }
 
     @Transactional
-    public Account updateAbsoluteLimit(String iban, UpdateLimitsRequestDTO dto) {
+    public Account updateAbsoluteLimit(String iban, SetAbsoluteLimitRequestDTO dto) {
         Account account = accountRepository.findById(iban)
-                .orElseThrow(() -> new EntityNotFoundException("Account not found: " + iban));
+                .orElseThrow(() -> new AccountNotFoundException(iban));
         if (dto.getAbsoluteLimit() == null) {
             throw new BusinessRuleException("absoluteLimit is required");
+        }
+        if (dto.getAbsoluteLimit().compareTo(BigDecimal.ZERO) > 0) {
+            throw new BusinessRuleException("Absolute limit cannot be positive");
         }
         account.setAbsoluteLimit(dto.getAbsoluteLimit());
         return accountRepository.save(account);
     }
 
     @Transactional
-    public Account updateDailyTransferLimit(String iban, UpdateLimitsRequestDTO dto) {
+    public Account updateDailyTransferLimit(String iban, SetDailyLimitRequestDTO dto) {
         Account account = accountRepository.findById(iban)
-                .orElseThrow(() -> new EntityNotFoundException("Account not found: " + iban));
+                .orElseThrow(() -> new AccountNotFoundException(iban));
         if (dto.getDailyTransferLimit() == null) {
             throw new BusinessRuleException("dailyTransferLimit is required");
         }
@@ -133,5 +156,11 @@ public class AccountService {
         }
         account.setDailyTransferLimit(dto.getDailyTransferLimit());
         return accountRepository.save(account);
+    }
+
+    public Page<Account> getAccountsByCustomer(Long customerId, Pageable pageable) {
+        User user = userRepository.findById(customerId)
+                .orElseThrow(() -> new CustomerNotFoundException(customerId));
+        return accountRepository.findByUserId(user.getId(), pageable);
     }
 }
