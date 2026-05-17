@@ -5,6 +5,7 @@ import com.bankie.bankie_api.security.JwtAuthFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.Customizer;
@@ -66,6 +67,9 @@ public class SecurityConfig {
                                 "/v3/api-docs/**", "/api-docs/**",
                                 "/h2-console/**")
                         .permitAll()
+                        .requestMatchers(HttpMethod.GET, "/transactions").authenticated()
+                        .requestMatchers(HttpMethod.POST, "/transactions", "/transactions/withdraw", "/transactions/deposit")
+                            .hasAnyRole("CUSTOMER", "EMPLOYEE")
                         .requestMatchers("/transactions/**", "/customers/**", "/users/**").hasRole("EMPLOYEE")
                         .anyRequest().authenticated())
                 .exceptionHandling(eh -> eh
