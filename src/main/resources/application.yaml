@@ -25,3 +25,9 @@ springdoc:
     path: /swagger-ui.html
   api-docs:
     path: /api-docs
+
+bankie:
+  iban:
+    bank-code: INHO0
+  account:
+    default-daily-limit: 1000.00
