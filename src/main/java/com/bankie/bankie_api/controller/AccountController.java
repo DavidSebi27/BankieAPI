@@ -54,6 +54,15 @@ public class AccountController {
         return ResponseEntity.ok(accounts.map(accountMapper::toSearchResponseDto));
     }
 
+    @GetMapping("/verify-recipient")
+    public ResponseEntity<SearchAccountResponseDTO> verifyRecipient(
+            @RequestParam String iban,
+            @RequestParam String firstName,
+            @RequestParam String lastName) {
+        Account account = accountService.verifyRecipient(iban, firstName, lastName);
+        return ResponseEntity.ok(accountMapper.toSearchResponseDto(account));
+    }
+
     @GetMapping("/customers/without-accounts")
     @PreAuthorize("hasRole('EMPLOYEE')")
     public ResponseEntity<PageResponse<UserResponseDTO>> getCustomersWithoutAccounts(

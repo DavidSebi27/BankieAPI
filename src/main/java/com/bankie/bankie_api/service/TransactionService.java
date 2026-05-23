@@ -55,8 +55,7 @@ public class TransactionService {
                     .map(Account::getIban)
                     .toList();
 
-            // Prevent a customer from filtering by an IBAN they don't own
-            if (iban != null && ownerIbans.stream().noneMatch(i -> i.equalsIgnoreCase(iban))) {
+            if (ownerIbans.isEmpty()) {
                 return Page.empty(pageable);
             }
 
