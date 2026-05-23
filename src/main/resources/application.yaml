@@ -1,3 +1,6 @@
+server:
+  port: ${PORT:8080}
+
 spring:
   application:
     name: bankie-api
@@ -10,15 +13,18 @@ spring:
     database-platform: org.hibernate.dialect.H2Dialect
     hibernate:
       ddl-auto: create-drop
-    show-sql: true
+    show-sql: false
   h2:
     console:
-      enabled: true
+      enabled: ${H2_CONSOLE_ENABLED:false}
       path: /h2-console
 
 jwt:
   secret: ${JWT_SECRET}
   expiration: ${JWT_EXPIRATION_MS:86400000}
+
+cors:
+  allowed-origins: ${CORS_ORIGINS:http://localhost:5173,http://localhost:3000,https://*.netlify.app}
 
 springdoc:
   swagger-ui:
