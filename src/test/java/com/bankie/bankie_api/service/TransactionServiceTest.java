@@ -13,6 +13,7 @@ import com.bankie.bankie_api.enums.Role;
 import com.bankie.bankie_api.enums.TransactionType;
 import com.bankie.bankie_api.exception.BusinessRuleException;
 import com.bankie.bankie_api.mapper.TransactionMapper;
+import com.bankie.bankie_api.policy.TransactionPolicy;
 import com.bankie.bankie_api.repository.AccountRepository;
 import com.bankie.bankie_api.repository.TransactionRepository;
 import com.bankie.bankie_api.repository.UserRepository;
@@ -22,6 +23,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -56,6 +58,7 @@ class TransactionServiceTest {
     @Mock UserRepository userRepository;
     @Mock AccountRepository accountRepository;
     @Mock TransactionMapper transactionMapper;
+    @Spy TransactionPolicy policy = new TransactionPolicy();
     @InjectMocks TransactionService service;
 
     private User customer;
