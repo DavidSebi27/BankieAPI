@@ -17,7 +17,13 @@ import java.util.List;
 @Repository
 public interface TransactionRepository extends JpaRepository<Transaction, Long> {
 
-    @Query("SELECT t FROM Transaction t WHERE t.fromIban IN :ibans OR t.toIban IN :ibans")
+    @Query(value = "SELECT t FROM Transaction t " +
+            "LEFT JOIN FETCH t.fromAccount fa " +
+            "LEFT JOIN FETCH fa.user " +
+            "LEFT JOIN FETCH t.toAccount ta " +
+            "LEFT JOIN FETCH ta.user " +
+            "WHERE t.fromIban IN :ibans OR t.toIban IN :ibans",
+            countQuery = "SELECT count(t) FROM Transaction t WHERE t.fromIban IN :ibans OR t.toIban IN :ibans")
     Page<Transaction> findByIbanIn(@Param("ibans") Collection<String> ibans, Pageable pageable);
 
     @Query("SELECT COALESCE(SUM(t.amount), 0) FROM Transaction t WHERE t.timestamp >= :since AND (" +

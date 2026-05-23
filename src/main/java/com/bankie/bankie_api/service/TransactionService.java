@@ -1,6 +1,7 @@
 package com.bankie.bankie_api.service;
 
 import com.bankie.bankie_api.dto.request.AtmRequestDTO;
+import com.bankie.bankie_api.dto.request.TransactionFilterDTO;
 import com.bankie.bankie_api.dto.request.TransferRequestDTO;
 import com.bankie.bankie_api.dto.response.TransactionResponseDTO;
 import com.bankie.bankie_api.entity.Account;
@@ -9,7 +10,6 @@ import com.bankie.bankie_api.entity.User;
 import com.bankie.bankie_api.enums.AccountStatus;
 import com.bankie.bankie_api.enums.AccountType;
 import com.bankie.bankie_api.enums.Role;
-import com.bankie.bankie_api.enums.TransactionType;
 import com.bankie.bankie_api.exception.BusinessRuleException;
 import com.bankie.bankie_api.exception.CustomerNotFoundException;
 import com.bankie.bankie_api.mapper.TransactionMapper;
@@ -41,11 +41,10 @@ public class TransactionService {
     private final AccountRepository accountRepository;
     private final TransactionMapper transactionMapper;
 
-    public Page<TransactionResponseDTO> findAll(Long initiatedBy, TransactionType type, String iban,
-                                                LocalDateTime start, LocalDateTime end,
-                                                BigDecimal min, BigDecimal max,
-                                                Pageable pageable, String email, boolean isEmployee) {
+    public Page<TransactionResponseDTO> findAll(TransactionFilterDTO filter, Pageable pageable,
+                                                String email, boolean isEmployee) {
         List<String> ownerIbans = null;
+        Long initiatedBy = filter.getInitiatedBy();
 
         if (!isEmployee) {
             User currentUser = userRepository.findByEmail(email)
@@ -55,28 +54,18 @@ public class TransactionService {
                     .map(Account::getIban)
                     .toList();
 
-            // Prevent a customer from filtering by an IBAN they don't own
-            if (iban != null && ownerIbans.stream().noneMatch(i -> i.equalsIgnoreCase(iban))) {
+            if (filter.getIban() != null && ownerIbans.stream().noneMatch(i -> i.equalsIgnoreCase(filter.getIban()))) {
                 return Page.empty(pageable);
             }
 
             initiatedBy = null;
         }
 
-        Page<Transaction> transactions = transactionRepository.findAllFiltered(initiatedBy, ownerIbans, type, iban, start, end, min, max, pageable);
+        Page<Transaction> transactions = transactionRepository.findAllFiltered(
+                initiatedBy, ownerIbans, filter.getType(), filter.getIban(),
+                filter.getStart(), filter.getEnd(), filter.getMinAmount(), filter.getMaxAmount(), pageable);
 
-        return transactions.map(tx -> {
-            // Extract names directly from the joined entities
-            String fromName = (tx.getFromAccount() != null)
-                    ? tx.getFromAccount().getUser().getFirstName() + " " + tx.getFromAccount().getUser().getLastName()
-                    : "External/ATM";
-
-            String toName = (tx.getToAccount() != null)
-                    ? tx.getToAccount().getUser().getFirstName() + " " + tx.getToAccount().getUser().getLastName()
-                    : "External/ATM";
-
-            return transactionMapper.toResponseDto(tx, fromName, toName);
-        });
+        return transactions.map(transactionMapper::toResponseDto);
     }
 
     public Page<TransactionResponseDTO> findByCustomer(Long customerId, Pageable pageable) {
@@ -90,7 +79,7 @@ public class TransactionService {
 
         if (ibans.isEmpty()) return Page.empty(pageable);
 
-        return mapWithNames(transactionRepository.findByIbanIn(ibans, pageable));
+        return mapWithInitiatorNames(transactionRepository.findByIbanIn(ibans, pageable));
     }
 
     @Transactional
@@ -126,17 +115,10 @@ public class TransactionService {
         accountRepository.save(source);
         accountRepository.save(destination);
 
-        Transaction tx = transactionRepository.save(Transaction.builder()
-                .type(TransactionType.TRANSFER)
-                .fromIban(source.getIban())
-                .toIban(destination.getIban())
-                .amount(amount)
-                .currency(source.getCurrency())
-                .timestamp(LocalDateTime.now())
-                .initiatedBy(initiator.getId())
-                .build());
+        Transaction tx = transactionRepository.save(
+                transactionMapper.toTransferEntity(request, initiator.getId(), source.getCurrency()));
 
-        return toDto(tx, initiator);
+        return transactionMapper.toResponseDto(tx, initiator);
     }
 
     @Transactional
@@ -156,16 +138,10 @@ public class TransactionService {
         account.setBalance(newBalance);
         accountRepository.save(account);
 
-        Transaction tx = transactionRepository.save(Transaction.builder()
-                .type(TransactionType.WITHDRAWAL)
-                .fromIban(account.getIban())
-                .amount(amount)
-                .currency(account.getCurrency())
-                .timestamp(LocalDateTime.now())
-                .initiatedBy(initiator.getId())
-                .build());
+        Transaction tx = transactionRepository.save(
+                transactionMapper.toWithdrawalEntity(request, initiator.getId(), account.getCurrency()));
 
-        return toDto(tx, initiator);
+        return transactionMapper.toResponseDto(tx, initiator);
     }
 
     @Transactional
@@ -181,16 +157,10 @@ public class TransactionService {
         account.setBalance(account.getBalance().add(amount));
         accountRepository.save(account);
 
-        Transaction tx = transactionRepository.save(Transaction.builder()
-                .type(TransactionType.DEPOSIT)
-                .toIban(account.getIban())
-                .amount(amount)
-                .currency(account.getCurrency())
-                .timestamp(LocalDateTime.now())
-                .initiatedBy(initiator.getId())
-                .build());
+        Transaction tx = transactionRepository.save(
+                transactionMapper.toDepositEntity(request, initiator.getId(), account.getCurrency()));
 
-        return toDto(tx, initiator);
+        return transactionMapper.toResponseDto(tx, initiator);
     }
 
     private void enforceDailyLimit(Account account, BigDecimal amount, String label) {
@@ -206,12 +176,6 @@ public class TransactionService {
                 .orElseThrow(() -> new BusinessRuleException("Initiator not found"));
     }
 
-    private TransactionResponseDTO toDto(Transaction tx, User initiator) {
-        TransactionResponseDTO dto = transactionMapper.toResponseDto(tx);
-        dto.setInitiatedByName(initiator.getFirstName() + " " + initiator.getLastName());
-        return dto;
-    }
-
     private void requireActiveCustomerChecking(Account account, String label) {
         if (account.getType() != AccountType.CHECKING) {
             throw new BusinessRuleException(label + " account must be a checking account");
@@ -224,7 +188,7 @@ public class TransactionService {
         }
     }
 
-    private Page<TransactionResponseDTO> mapWithNames(Page<Transaction> page) {
+    private Page<TransactionResponseDTO> mapWithInitiatorNames(Page<Transaction> page) {
         Set<Long> userIds = page.stream()
                 .map(Transaction::getInitiatedBy)
                 .filter(Objects::nonNull)

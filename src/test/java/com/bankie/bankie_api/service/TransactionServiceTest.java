@@ -1,6 +1,7 @@
 package com.bankie.bankie_api.service;
 
 import com.bankie.bankie_api.dto.request.AtmRequestDTO;
+import com.bankie.bankie_api.dto.request.TransactionFilterDTO;
 import com.bankie.bankie_api.dto.request.TransferRequestDTO;
 import com.bankie.bankie_api.dto.response.TransactionResponseDTO;
 import com.bankie.bankie_api.entity.Account;
@@ -101,6 +102,49 @@ class TransactionServiceTest {
         return a;
     }
 
+    private void stubTransferEntityMapping() {
+        when(transactionMapper.toTransferEntity(any(), any(), any())).thenAnswer(inv -> {
+            TransferRequestDTO req = inv.getArgument(0);
+            return Transaction.builder()
+                    .type(TransactionType.TRANSFER)
+                    .fromIban(req.getFromIban())
+                    .toIban(req.getToIban())
+                    .amount(req.getAmount())
+                    .currency(inv.getArgument(2))
+                    .initiatedBy(inv.getArgument(1))
+                    .timestamp(LocalDateTime.now())
+                    .build();
+        });
+    }
+
+    private void stubWithdrawalEntityMapping() {
+        when(transactionMapper.toWithdrawalEntity(any(), any(), any())).thenAnswer(inv -> {
+            AtmRequestDTO req = inv.getArgument(0);
+            return Transaction.builder()
+                    .type(TransactionType.WITHDRAWAL)
+                    .fromIban(req.getIban())
+                    .amount(req.getAmount())
+                    .currency(inv.getArgument(2))
+                    .initiatedBy(inv.getArgument(1))
+                    .timestamp(LocalDateTime.now())
+                    .build();
+        });
+    }
+
+    private void stubDepositEntityMapping() {
+        when(transactionMapper.toDepositEntity(any(), any(), any())).thenAnswer(inv -> {
+            AtmRequestDTO req = inv.getArgument(0);
+            return Transaction.builder()
+                    .type(TransactionType.DEPOSIT)
+                    .toIban(req.getIban())
+                    .amount(req.getAmount())
+                    .currency(inv.getArgument(2))
+                    .initiatedBy(inv.getArgument(1))
+                    .timestamp(LocalDateTime.now())
+                    .build();
+        });
+    }
+
     @Test
     void transfer_happyPath_debitsSourceCreditsDestinationAndPersistsTransaction() {
         when(accountRepository.findById(FROM)).thenReturn(Optional.of(source));
@@ -108,13 +152,15 @@ class TransactionServiceTest {
         when(transactionRepository.sumDailyMovementsSince(eq(FROM), any()))
                 .thenReturn(BigDecimal.ZERO);
         when(userRepository.findByEmail(EMPLOYEE_EMAIL)).thenReturn(Optional.of(employee));
+        stubTransferEntityMapping();
         when(transactionRepository.save(any(Transaction.class))).thenAnswer(inv -> {
             Transaction t = inv.getArgument(0);
             t.setId(1L);
             return t;
         });
-        when(transactionMapper.toResponseDto(any(Transaction.class)))
-                .thenReturn(TransactionResponseDTO.builder().id(1L).type(TransactionType.TRANSFER).build());
+        when(transactionMapper.toResponseDto(any(Transaction.class), eq(employee)))
+                .thenReturn(TransactionResponseDTO.builder()
+                        .id(1L).type(TransactionType.TRANSFER).initiatedByName("Em Ployee").build());
 
         TransactionResponseDTO result = service.transfer(request(new BigDecimal("150.00")), EMPLOYEE_EMAIL);
 
@@ -243,12 +289,13 @@ class TransactionServiceTest {
         when(accountRepository.findById(FROM)).thenReturn(Optional.of(source));
         when(transactionRepository.sumDailyMovementsSince(eq(FROM), any())).thenReturn(BigDecimal.ZERO);
         when(userRepository.findByEmail(EMPLOYEE_EMAIL)).thenReturn(Optional.of(employee));
+        stubWithdrawalEntityMapping();
         when(transactionRepository.save(any(Transaction.class))).thenAnswer(inv -> {
             Transaction t = inv.getArgument(0);
             t.setId(1L);
             return t;
         });
-        when(transactionMapper.toResponseDto(any(Transaction.class)))
+        when(transactionMapper.toResponseDto(any(Transaction.class), eq(employee)))
                 .thenReturn(TransactionResponseDTO.builder().id(1L).type(TransactionType.WITHDRAWAL).build());
 
         service.withdraw(atm(FROM, new BigDecimal("100.00")), EMPLOYEE_EMAIL);
@@ -304,12 +351,13 @@ class TransactionServiceTest {
         when(accountRepository.findById(FROM)).thenReturn(Optional.of(source));
         when(transactionRepository.sumDailyMovementsSince(eq(FROM), any())).thenReturn(BigDecimal.ZERO);
         when(userRepository.findByEmail(EMPLOYEE_EMAIL)).thenReturn(Optional.of(employee));
+        stubDepositEntityMapping();
         when(transactionRepository.save(any(Transaction.class))).thenAnswer(inv -> {
             Transaction t = inv.getArgument(0);
             t.setId(2L);
             return t;
         });
-        when(transactionMapper.toResponseDto(any(Transaction.class)))
+        when(transactionMapper.toResponseDto(any(Transaction.class), eq(employee)))
                 .thenReturn(TransactionResponseDTO.builder().id(2L).type(TransactionType.DEPOSIT).build());
 
         service.deposit(atm(FROM, new BigDecimal("75.00")), EMPLOYEE_EMAIL);
@@ -372,10 +420,10 @@ class TransactionServiceTest {
         when(transactionRepository.findAllFiltered(
                 isNull(), eq(List.of(CUSTOMER_IBAN)), isNull(), isNull(), isNull(), isNull(), isNull(), isNull(), eq(pageable)))
                 .thenReturn(new PageImpl<>(List.of(tx)));
-        when(transactionMapper.toResponseDto(eq(tx), any(), any())).thenReturn(dto);
+        when(transactionMapper.toResponseDto(eq(tx))).thenReturn(dto);
 
         Page<TransactionResponseDTO> result = service.findAll(
-                null, null, null, null, null, null, null, pageable, CUSTOMER_EMAIL, false);
+                new TransactionFilterDTO(), pageable, CUSTOMER_EMAIL, false);
 
         assertThat(result.getContent()).containsExactly(dto);
         verify(transactionRepository).findAllFiltered(
@@ -391,8 +439,10 @@ class TransactionServiceTest {
         when(userRepository.findByEmail(CUSTOMER_EMAIL)).thenReturn(Optional.of(c));
         when(accountRepository.findByUser(c)).thenReturn(List.of(account));
 
-        Page<TransactionResponseDTO> result = service.findAll(
-                null, null, "NL99SOMEONEELSE0000", null, null, null, null, pageable, CUSTOMER_EMAIL, false);
+        TransactionFilterDTO filter = new TransactionFilterDTO();
+        filter.setIban("NL99SOMEONEELSE0000");
+
+        Page<TransactionResponseDTO> result = service.findAll(filter, pageable, CUSTOMER_EMAIL, false);
 
         assertThat(result.isEmpty()).isTrue();
         verifyNoInteractions(transactionRepository);
@@ -407,8 +457,10 @@ class TransactionServiceTest {
                 eq(targetUserId), isNull(), isNull(), isNull(), isNull(), isNull(), isNull(), isNull(), eq(pageable)))
                 .thenReturn(Page.empty());
 
-        Page<TransactionResponseDTO> result = service.findAll(
-                targetUserId, null, null, null, null, null, null, pageable, "employee@bankie.nl", true);
+        TransactionFilterDTO filter = new TransactionFilterDTO();
+        filter.setInitiatedBy(targetUserId);
+
+        Page<TransactionResponseDTO> result = service.findAll(filter, pageable, "employee@bankie.nl", true);
 
         assertThat(result.isEmpty()).isTrue();
         verify(transactionRepository).findAllFiltered(

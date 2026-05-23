@@ -1,9 +1,9 @@
 package com.bankie.bankie_api.controller;
 
 import com.bankie.bankie_api.dto.request.AtmRequestDTO;
+import com.bankie.bankie_api.dto.request.TransactionFilterDTO;
 import com.bankie.bankie_api.dto.request.TransferRequestDTO;
 import com.bankie.bankie_api.dto.response.TransactionResponseDTO;
-import com.bankie.bankie_api.enums.TransactionType;
 import com.bankie.bankie_api.service.TransactionService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -20,12 +20,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
-
-import java.math.BigDecimal;
-import java.time.LocalDateTime;
 
 @RestController
 @RequestMapping("/transactions")
@@ -36,13 +32,7 @@ public class TransactionController {
 
     @GetMapping
     public ResponseEntity<Page<TransactionResponseDTO>> getAllTransactions(
-            @RequestParam(required = false) Long initiatedBy,
-            @RequestParam(required = false) TransactionType type,
-            @RequestParam(required = false) String iban,
-            @RequestParam(required = false) LocalDateTime start,
-            @RequestParam(required = false) LocalDateTime end,
-            @RequestParam(required = false) BigDecimal minAmount,
-            @RequestParam(required = false) BigDecimal maxAmount,
+            @ParameterObject TransactionFilterDTO filter,
             @ParameterObject @PageableDefault(size = 20, sort = "timestamp", direction = Sort.Direction.DESC) Pageable pageable,
             Authentication authentication) {
 
@@ -50,10 +40,7 @@ public class TransactionController {
         boolean isEmployee = authentication.getAuthorities().stream()
                 .anyMatch(a -> a.getAuthority().equals("ROLE_EMPLOYEE"));
 
-        Page<TransactionResponseDTO> response = transactionService.findAll(
-                initiatedBy, type, iban, start, end, minAmount, maxAmount, pageable, email, isEmployee);
-
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(transactionService.findAll(filter, pageable, email, isEmployee));
     }
 
     @PostMapping
