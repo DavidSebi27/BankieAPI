@@ -63,6 +63,26 @@ public class AccountService {
         return results;
     }
 
+    @Transactional(readOnly = true)
+    public Account verifyRecipient(String iban, String firstName, String lastName) {
+        String normalizedIban = iban == null ? "" : iban.replaceAll("\\s", "").toUpperCase();
+        String inFirst = firstName == null ? "" : firstName.trim();
+        String inLast  = lastName  == null ? "" : lastName.trim();
+
+        return accountRepository.findById(normalizedIban)
+                .filter(a -> a.getStatus() == AccountStatus.ACTIVE)
+                .filter(a -> a.getUser() != null
+                        && a.getUser().getRole() == Role.CUSTOMER
+                        && a.getUser().isApproved())
+                .filter(a -> equalsTrimCi(a.getUser().getFirstName(), inFirst)
+                        && equalsTrimCi(a.getUser().getLastName(), inLast))
+                .orElseThrow(() -> new AccountNotFoundException(normalizedIban));
+    }
+
+    private static boolean equalsTrimCi(String a, String b) {
+        return a != null && b != null && a.trim().equalsIgnoreCase(b.trim());
+    }
+
     public Page<User> getCustomersWithoutAccounts(Pageable pageable) {
         return userRepository.findByRoleAndNoAccounts(Role.CUSTOMER, pageable);
     }
