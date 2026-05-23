@@ -69,7 +69,8 @@ public class SecurityConfig {
                                 "/auth/**",
                                 "/swagger-ui/**", "/swagger-ui.html",
                                 "/v3/api-docs/**", "/api-docs/**",
-                                "/h2-console/**")
+                                "/h2-console/**",
+                                "/actuator/health")
                         .permitAll()
                         .requestMatchers(HttpMethod.GET, "/transactions").authenticated()
                         .requestMatchers(HttpMethod.POST, "/transactions", "/transactions/withdraw", "/transactions/deposit")
