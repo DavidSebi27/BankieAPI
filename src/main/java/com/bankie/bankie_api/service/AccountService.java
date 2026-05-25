@@ -87,6 +87,10 @@ public class AccountService {
         return userRepository.findByRoleAndNoAccounts(Role.CUSTOMER, pageable);
     }
 
+    public Page<User> getCustomersWithAllAccountsClosed(Pageable pageable) {
+        return userRepository.findByRoleAndAllAccountsClosed(Role.CUSTOMER, pageable);
+    }
+
     @Transactional
     public List<Account> approveCustomerAndCreateAccounts(Long userId, CreateAccountRequestDTO dto) {
         User user = userRepository.findById(userId)

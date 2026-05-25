@@ -1,6 +1,7 @@
 package com.bankie.bankie_api.controller;
 
 import com.bankie.bankie_api.dto.PageResponse;
+import com.bankie.bankie_api.dto.request.CreateAccountRequestDTO;
 import com.bankie.bankie_api.dto.request.SetAbsoluteLimitRequestDTO;
 import com.bankie.bankie_api.dto.request.SetDailyLimitRequestDTO;
 import com.bankie.bankie_api.dto.response.AccountResponseDTO;
@@ -37,7 +38,6 @@ public class AccountController {
     public ResponseEntity<Page<AccountResponseDTO>> getAccounts(
             @PageableDefault(size = 20, sort = "iban") Pageable pageable,
             Authentication authentication) {
-
         Page<Account> accounts = accountService.getAccountsForUser(authentication, pageable);
         return ResponseEntity.ok(accounts.map(accountMapper::toResponseDto));
     }
@@ -47,7 +47,7 @@ public class AccountController {
             @RequestParam(required = true) String firstName,
             @RequestParam(required = true) String lastName,
             @PageableDefault(size = 10) Pageable pageable,
-            Authentication authentication){
+            Authentication authentication) {
         Page<Account> accounts = accountService.searchAccounts(firstName, lastName, pageable, authentication);
         System.out.println("Search Results Count: " + accounts.getTotalElements());
         accounts.getContent().forEach(a -> System.out.println("Found IBAN: " + a.getIban()));
@@ -71,6 +71,14 @@ public class AccountController {
         return ResponseEntity.ok(PageResponse.from(users.map(userMapper::toResponseDto)));
     }
 
+    @GetMapping("/customers/all-accounts-closed")
+    @PreAuthorize("hasRole('EMPLOYEE')")
+    public ResponseEntity<PageResponse<UserResponseDTO>> getCustomersWithAllAccountsClosed(
+            @ParameterObject @PageableDefault(size = 20) Pageable pageable) {
+        Page<User> users = accountService.getCustomersWithAllAccountsClosed(pageable);
+        return ResponseEntity.ok(PageResponse.from(users.map(userMapper::toResponseDto)));
+    }
+
     @GetMapping("/customers/{customerId}/accounts")
     @PreAuthorize("hasRole('EMPLOYEE')")
     public ResponseEntity<Page<AccountResponseDTO>> getAccountsByCustomer(
@@ -78,6 +86,16 @@ public class AccountController {
             @PageableDefault(size = 20) Pageable pageable) {
         Page<Account> accounts = accountService.getAccountsByCustomer(customerId, pageable);
         return ResponseEntity.ok(accounts.map(accountMapper::toResponseDto));
+    }
+
+    @PostMapping("/customers/{customerId}/approve")
+    @PreAuthorize("hasRole('EMPLOYEE')")
+    public ResponseEntity<List<AccountResponseDTO>> approveCustomer(
+            @PathVariable Long customerId,
+            @RequestBody CreateAccountRequestDTO dto) {
+        List<Account> accounts = accountService.approveCustomerAndCreateAccounts(customerId, dto);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(accounts.stream().map(accountMapper::toResponseDto).toList());
     }
 
     @PatchMapping("/{iban}/close")
