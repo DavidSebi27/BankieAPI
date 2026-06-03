@@ -19,4 +19,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     @Query("SELECT u FROM User u WHERE u.role = :role AND u.approved = false AND u.id NOT IN (SELECT a.user.id FROM Account a)")
     Page<User> findByRoleAndNoAccounts(@Param("role") Role role, Pageable pageable);
+
+    @Query("SELECT u FROM User u WHERE u.role = :role AND u.approved = true AND u.id IN (SELECT a.user.id FROM Account a) AND u.id NOT IN (SELECT a.user.id FROM Account a WHERE a.status <> 'CLOSED')")
+    Page<User> findByRoleAndAllAccountsClosed(@Param("role") Role role, Pageable pageable);
 }
