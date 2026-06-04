@@ -182,6 +182,10 @@ public class AccountService {
         return accountRepository.save(account);
     }
 
+    public Page<User> getAllCustomers(Pageable pageable) {
+        return userRepository.findAllByRole(Role.CUSTOMER, pageable);
+    }
+
     public Page<Account> getAccountsByCustomer(Long customerId, Pageable pageable) {
         User user = userRepository.findById(customerId)
                 .orElseThrow(() -> new CustomerNotFoundException(customerId));
