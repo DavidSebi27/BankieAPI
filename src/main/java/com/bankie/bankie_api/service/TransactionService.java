@@ -59,6 +59,8 @@ public class TransactionService {
                     .map(Account::getIban)
                     .toList();
 
+            if (ownerIbans.isEmpty()) return Page.empty(pageable);
+
             if (filter.getIban() != null && ownerIbans.stream().noneMatch(i -> i.equalsIgnoreCase(filter.getIban()))) {
                 return Page.empty(pageable);
             }
@@ -92,16 +94,21 @@ public class TransactionService {
         Account destination = accountRepository.findById(request.getToIban())
                 .orElseThrow(() -> new BusinessRuleException("Destination account not found"));
 
-        policy.requireActiveCustomerChecking(source, "Source");
-        policy.requireActiveCustomerChecking(destination, "Destination");
+        User initiator = resolveInitiator(authContext.email());
+
+        if (!authContext.isEmployee()) {
+            policy.requireOwnership(source, initiator, "Source");
+        }
+
+        policy.requireActiveCustomerOwned(source, "Source");
+        policy.requireActiveCustomerOwned(destination, "Destination");
+        policy.requireExternalTransferShape(source, destination);
         policy.requireSameCurrency(source, destination);
 
         BigDecimal amount = request.getAmount();
         BigDecimal newBalance = source.getBalance().subtract(amount);
         policy.requireWithinAbsoluteLimit(source, newBalance, "Transfer");
         policy.requireWithinDailyLimit(source, amount, dailyMovements(source), "Transfer");
-
-        User initiator = resolveInitiator(authContext.email());
 
         source.setBalance(newBalance);
         destination.setBalance(destination.getBalance().add(amount));

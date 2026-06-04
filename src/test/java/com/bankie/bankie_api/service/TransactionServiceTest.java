@@ -208,10 +208,13 @@ class TransactionServiceTest {
     }
 
     @Test
-    void transfer_rejectsWhenDestinationIsSavings() {
+    void transfer_rejectsWhenDestinationIsSavingsForExternalTransfer() {
         destination.setType(AccountType.SAVINGS);
+        User otherCustomer = User.builder().id(11L).firstName("Other").lastName("Cust").role(Role.CUSTOMER).build();
+        destination.setUser(otherCustomer);
         when(accountRepository.findById(FROM)).thenReturn(Optional.of(source));
         when(accountRepository.findById(TO)).thenReturn(Optional.of(destination));
+        when(userRepository.findByEmail(EMPLOYEE_EMAIL)).thenReturn(Optional.of(employee));
 
         assertThatThrownBy(() -> service.transfer(request(new BigDecimal("10.00")), new AuthContext(EMPLOYEE_EMAIL, true)))
                 .isInstanceOf(BusinessRuleException.class)
@@ -225,6 +228,7 @@ class TransactionServiceTest {
         source.setStatus(AccountStatus.CLOSED);
         when(accountRepository.findById(FROM)).thenReturn(Optional.of(source));
         when(accountRepository.findById(TO)).thenReturn(Optional.of(destination));
+        when(userRepository.findByEmail(EMPLOYEE_EMAIL)).thenReturn(Optional.of(employee));
 
         assertThatThrownBy(() -> service.transfer(request(new BigDecimal("10.00")), new AuthContext(EMPLOYEE_EMAIL, true)))
                 .isInstanceOf(BusinessRuleException.class)
@@ -238,6 +242,7 @@ class TransactionServiceTest {
         source.setUser(employee);
         when(accountRepository.findById(FROM)).thenReturn(Optional.of(source));
         when(accountRepository.findById(TO)).thenReturn(Optional.of(destination));
+        when(userRepository.findByEmail(EMPLOYEE_EMAIL)).thenReturn(Optional.of(employee));
 
         assertThatThrownBy(() -> service.transfer(request(new BigDecimal("10.00")), new AuthContext(EMPLOYEE_EMAIL, true)))
                 .isInstanceOf(BusinessRuleException.class)
@@ -251,6 +256,7 @@ class TransactionServiceTest {
         destination.setCurrency("USD");
         when(accountRepository.findById(FROM)).thenReturn(Optional.of(source));
         when(accountRepository.findById(TO)).thenReturn(Optional.of(destination));
+        when(userRepository.findByEmail(EMPLOYEE_EMAIL)).thenReturn(Optional.of(employee));
 
         assertThatThrownBy(() -> service.transfer(request(new BigDecimal("10.00")), new AuthContext(EMPLOYEE_EMAIL, true)))
                 .isInstanceOf(BusinessRuleException.class)
@@ -265,6 +271,7 @@ class TransactionServiceTest {
         source.setAbsoluteLimit(new BigDecimal("0.00"));
         when(accountRepository.findById(FROM)).thenReturn(Optional.of(source));
         when(accountRepository.findById(TO)).thenReturn(Optional.of(destination));
+        when(userRepository.findByEmail(EMPLOYEE_EMAIL)).thenReturn(Optional.of(employee));
 
         assertThatThrownBy(() -> service.transfer(request(new BigDecimal("100.00")), new AuthContext(EMPLOYEE_EMAIL, true)))
                 .isInstanceOf(BusinessRuleException.class)
@@ -278,12 +285,27 @@ class TransactionServiceTest {
         source.setDailyTransferLimit(new BigDecimal("200.00"));
         when(accountRepository.findById(FROM)).thenReturn(Optional.of(source));
         when(accountRepository.findById(TO)).thenReturn(Optional.of(destination));
+        when(userRepository.findByEmail(EMPLOYEE_EMAIL)).thenReturn(Optional.of(employee));
         when(transactionRepository.sumDailyMovementsSince(eq(FROM), any(LocalDateTime.class)))
                 .thenReturn(new BigDecimal("150.00"));
 
         assertThatThrownBy(() -> service.transfer(request(new BigDecimal("100.00")), new AuthContext(EMPLOYEE_EMAIL, true)))
                 .isInstanceOf(BusinessRuleException.class)
                 .hasMessageContaining("daily transfer limit");
+
+        verify(transactionRepository, never()).save(any());
+    }
+
+    @Test
+    void transfer_customerCannotTransferFromAccountTheyDoNotOwn() {
+        User otherCustomer = User.builder().id(11L).email("other@bankie.nl").firstName("Other").lastName("One").role(Role.CUSTOMER).build();
+        when(accountRepository.findById(FROM)).thenReturn(Optional.of(source));
+        when(accountRepository.findById(TO)).thenReturn(Optional.of(destination));
+        when(userRepository.findByEmail("other@bankie.nl")).thenReturn(Optional.of(otherCustomer));
+
+        assertThatThrownBy(() -> service.transfer(request(new BigDecimal("10.00")), new AuthContext("other@bankie.nl", false)))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("do not own");
 
         verify(transactionRepository, never()).save(any());
     }

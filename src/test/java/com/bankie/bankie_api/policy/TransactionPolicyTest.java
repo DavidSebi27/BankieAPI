@@ -98,6 +98,99 @@ class TransactionPolicyTest {
                 .hasMessageStartingWith("Destination");
     }
 
+    // requireActiveCustomerOwned
+
+    @Test
+    void requireActiveCustomerOwned_passesForActiveCustomerSavingsAccount() {
+        activeChecking.setType(AccountType.SAVINGS);
+        assertThatCode(() -> policy.requireActiveCustomerOwned(activeChecking, "Source"))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void requireActiveCustomerOwned_throwsForClosedAccount() {
+        activeChecking.setStatus(AccountStatus.CLOSED);
+        assertThatThrownBy(() -> policy.requireActiveCustomerOwned(activeChecking, "Source"))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("not active");
+    }
+
+    @Test
+    void requireActiveCustomerOwned_throwsWhenOwnerIsEmployee() {
+        activeChecking.setUser(User.builder().role(Role.EMPLOYEE).build());
+        assertThatThrownBy(() -> policy.requireActiveCustomerOwned(activeChecking, "Source"))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("customer");
+    }
+
+    // requireOwnership
+
+    @Test
+    void requireOwnership_passesWhenUserOwnsAccount() {
+        assertThatCode(() -> policy.requireOwnership(activeChecking, customer, "Source"))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void requireOwnership_throwsWhenUserDoesNotOwnAccount() {
+        User other = User.builder().id(2L).role(Role.CUSTOMER).build();
+        assertThatThrownBy(() -> policy.requireOwnership(activeChecking, other, "Source"))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("do not own");
+    }
+
+    @Test
+    void requireOwnership_throwsWhenAccountHasNoOwner() {
+        activeChecking.setUser(null);
+        assertThatThrownBy(() -> policy.requireOwnership(activeChecking, customer, "Source"))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("do not own");
+    }
+
+    // requireExternalTransferShape
+
+    @Test
+    void requireExternalTransferShape_passesForInternalTransferToSavings() {
+        Account savings = Account.builder()
+                .type(AccountType.SAVINGS).status(AccountStatus.ACTIVE)
+                .currency("EUR").user(customer).build();
+        assertThatCode(() -> policy.requireExternalTransferShape(activeChecking, savings))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void requireExternalTransferShape_passesForExternalCheckingToChecking() {
+        User otherCustomer = User.builder().id(2L).role(Role.CUSTOMER).build();
+        Account otherChecking = Account.builder()
+                .type(AccountType.CHECKING).status(AccountStatus.ACTIVE)
+                .currency("EUR").user(otherCustomer).build();
+        assertThatCode(() -> policy.requireExternalTransferShape(activeChecking, otherChecking))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    void requireExternalTransferShape_throwsWhenExternalSourceIsSavings() {
+        activeChecking.setType(AccountType.SAVINGS);
+        User otherCustomer = User.builder().id(2L).role(Role.CUSTOMER).build();
+        Account otherChecking = Account.builder()
+                .type(AccountType.CHECKING).status(AccountStatus.ACTIVE)
+                .currency("EUR").user(otherCustomer).build();
+        assertThatThrownBy(() -> policy.requireExternalTransferShape(activeChecking, otherChecking))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("checking");
+    }
+
+    @Test
+    void requireExternalTransferShape_throwsWhenExternalDestinationIsSavings() {
+        User otherCustomer = User.builder().id(2L).role(Role.CUSTOMER).build();
+        Account otherSavings = Account.builder()
+                .type(AccountType.SAVINGS).status(AccountStatus.ACTIVE)
+                .currency("EUR").user(otherCustomer).build();
+        assertThatThrownBy(() -> policy.requireExternalTransferShape(activeChecking, otherSavings))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("checking");
+    }
+
     // requireSameCurrency
 
     @Test

@@ -15,6 +15,8 @@ public interface AccountRepository extends JpaRepository<Account, String> {
     List<Account> findByUser(User user);
 
     Page<Account> findByUserId(Long id, Pageable pageable);
+    boolean existsByUser(User user);
+    boolean existsByIban(String iban);
 
     @Query("SELECT a FROM Account a WHERE " +
             "(:first IS NULL OR LOWER(a.user.firstName) LIKE LOWER(CONCAT('%', :first, '%'))) AND " +
