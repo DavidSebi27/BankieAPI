@@ -8,6 +8,8 @@ import com.bankie.bankie_api.exception.BsnAlreadyExistsException;
 import com.bankie.bankie_api.exception.EmailAlreadyExistsException;
 import com.bankie.bankie_api.entity.User;
 import com.bankie.bankie_api.enums.Role;
+import com.bankie.bankie_api.mapper.UserMapper;
+import com.bankie.bankie_api.policy.UserPolicy;
 import com.bankie.bankie_api.repository.UserRepository;
 import com.bankie.bankie_api.security.JwtService;
 import org.junit.jupiter.api.Test;
@@ -35,6 +37,8 @@ class AuthServiceTest {
     @Mock PasswordEncoder passwordEncoder;
     @Mock AuthenticationManager authenticationManager;
     @Mock JwtService jwtService;
+    @Mock UserMapper userMapper;
+    @Mock UserPolicy userPolicy;
     @InjectMocks AuthService authService;
 
     private RegisterRequest validRequest() {
@@ -43,13 +47,30 @@ class AuthServiceTest {
 
     @Test
     void register_persistsCustomerWithHashedPasswordAndUnapproved() {
-        when(userRepository.existsByEmail(any())).thenReturn(false);
-        when(userRepository.existsByBsn(any())).thenReturn(false);
         when(passwordEncoder.encode("secret12")).thenReturn("HASHED");
+        when(userMapper.toEntity(any(RegisterRequest.class), eq("HASHED")))
+                .thenAnswer(inv -> {
+                    RegisterRequest req = inv.getArgument(0);
+                    return User.builder()
+                            .firstName(req.firstName())
+                            .lastName(req.lastName())
+                            .email(req.email())
+                            .password(inv.getArgument(1))
+                            .bsn(req.bsn())
+                            .phoneNumber(req.phoneNumber())
+                            .role(Role.CUSTOMER)
+                            .approved(false)
+                            .build();
+                });
         when(userRepository.save(any())).thenAnswer(inv -> {
             User u = inv.getArgument(0);
             u.setId(1L);
             return u;
+        });
+        when(userMapper.toSummary(any(User.class))).thenAnswer(inv -> {
+            User u = inv.getArgument(0);
+            return new UserSummary(u.getId(), u.getFirstName(), u.getLastName(),
+                    u.getEmail(), u.getRole(), u.isApproved());
         });
 
         UserSummary result = authService.register(validRequest());
@@ -66,7 +87,8 @@ class AuthServiceTest {
 
     @Test
     void register_throwsConflictWhenEmailTaken() {
-        when(userRepository.existsByEmail("john@bankie.nl")).thenReturn(true);
+        doThrow(new EmailAlreadyExistsException())
+                .when(userPolicy).requireEmailAvailable("john@bankie.nl");
 
         assertThrows(EmailAlreadyExistsException.class, () -> authService.register(validRequest()));
         verify(userRepository, never()).save(any());
@@ -74,8 +96,8 @@ class AuthServiceTest {
 
     @Test
     void register_throwsConflictWhenBsnTaken() {
-        when(userRepository.existsByEmail(any())).thenReturn(false);
-        when(userRepository.existsByBsn("123456789")).thenReturn(true);
+        doThrow(new BsnAlreadyExistsException())
+                .when(userPolicy).requireBsnAvailable("123456789");
 
         assertThrows(BsnAlreadyExistsException.class, () -> authService.register(validRequest()));
         verify(userRepository, never()).save(any());
@@ -86,6 +108,8 @@ class AuthServiceTest {
         User user = User.builder().id(1L).email("john@bankie.nl").role(Role.CUSTOMER).approved(false).build();
         when(userRepository.findByEmail("john@bankie.nl")).thenReturn(Optional.of(user));
         when(jwtService.generate(user)).thenReturn("jwt-token");
+        when(userMapper.toLoginResponse(user, "jwt-token"))
+                .thenReturn(new LoginResponse("jwt-token", Role.CUSTOMER, false));
 
         LoginResponse response = authService.login(new LoginRequest("john@bankie.nl", "secret12"));
 

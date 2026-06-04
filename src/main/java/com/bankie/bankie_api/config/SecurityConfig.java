@@ -85,7 +85,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/transactions").authenticated()
                         .requestMatchers(HttpMethod.POST, "/transactions", "/transactions/withdraw", "/transactions/deposit")
                             .hasAnyRole("CUSTOMER", "EMPLOYEE")
-                        .requestMatchers("/transactions/**", "/customers/**", "/users/**").hasRole("EMPLOYEE")
+                        .requestMatchers("/transactions/**", "/users/**").hasRole("EMPLOYEE")
                         .anyRequest().authenticated())
                 .exceptionHandling(eh -> eh
                         .authenticationEntryPoint((req, res, ex) -> writeNotFound(res, objectMapper))

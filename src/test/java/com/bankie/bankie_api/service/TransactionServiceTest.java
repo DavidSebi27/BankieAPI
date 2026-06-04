@@ -1,5 +1,6 @@
 package com.bankie.bankie_api.service;
 
+import com.bankie.bankie_api.dto.AuthContext;
 import com.bankie.bankie_api.dto.request.AtmRequestDTO;
 import com.bankie.bankie_api.dto.request.TransactionFilterDTO;
 import com.bankie.bankie_api.dto.request.TransferRequestDTO;
@@ -165,7 +166,7 @@ class TransactionServiceTest {
                 .thenReturn(TransactionResponseDTO.builder()
                         .id(1L).type(TransactionType.TRANSFER).initiatedByName("Em Ployee").build());
 
-        TransactionResponseDTO result = service.transfer(request(new BigDecimal("150.00")), EMPLOYEE_EMAIL);
+        TransactionResponseDTO result = service.transfer(request(new BigDecimal("150.00")), new AuthContext(EMPLOYEE_EMAIL, true));
 
         assertThat(source.getBalance()).isEqualByComparingTo("350.00");
         assertThat(destination.getBalance()).isEqualByComparingTo("250.00");
@@ -188,7 +189,7 @@ class TransactionServiceTest {
     void transfer_rejectsWhenSourceEqualsDestination() {
         TransferRequestDTO sameAccount = new TransferRequestDTO(FROM, FROM, new BigDecimal("10.00"));
 
-        assertThatThrownBy(() -> service.transfer(sameAccount, EMPLOYEE_EMAIL))
+        assertThatThrownBy(() -> service.transfer(sameAccount, new AuthContext(EMPLOYEE_EMAIL, true)))
                 .isInstanceOf(BusinessRuleException.class)
                 .hasMessageContaining("different");
 
@@ -199,7 +200,7 @@ class TransactionServiceTest {
     void transfer_rejectsWhenSourceAccountMissing() {
         when(accountRepository.findById(FROM)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.transfer(request(new BigDecimal("10.00")), EMPLOYEE_EMAIL))
+        assertThatThrownBy(() -> service.transfer(request(new BigDecimal("10.00")), new AuthContext(EMPLOYEE_EMAIL, true)))
                 .isInstanceOf(BusinessRuleException.class)
                 .hasMessageContaining("Source account not found");
 
@@ -212,7 +213,7 @@ class TransactionServiceTest {
         when(accountRepository.findById(FROM)).thenReturn(Optional.of(source));
         when(accountRepository.findById(TO)).thenReturn(Optional.of(destination));
 
-        assertThatThrownBy(() -> service.transfer(request(new BigDecimal("10.00")), EMPLOYEE_EMAIL))
+        assertThatThrownBy(() -> service.transfer(request(new BigDecimal("10.00")), new AuthContext(EMPLOYEE_EMAIL, true)))
                 .isInstanceOf(BusinessRuleException.class)
                 .hasMessageContaining("checking");
 
@@ -225,7 +226,7 @@ class TransactionServiceTest {
         when(accountRepository.findById(FROM)).thenReturn(Optional.of(source));
         when(accountRepository.findById(TO)).thenReturn(Optional.of(destination));
 
-        assertThatThrownBy(() -> service.transfer(request(new BigDecimal("10.00")), EMPLOYEE_EMAIL))
+        assertThatThrownBy(() -> service.transfer(request(new BigDecimal("10.00")), new AuthContext(EMPLOYEE_EMAIL, true)))
                 .isInstanceOf(BusinessRuleException.class)
                 .hasMessageContaining("not active");
 
@@ -238,7 +239,7 @@ class TransactionServiceTest {
         when(accountRepository.findById(FROM)).thenReturn(Optional.of(source));
         when(accountRepository.findById(TO)).thenReturn(Optional.of(destination));
 
-        assertThatThrownBy(() -> service.transfer(request(new BigDecimal("10.00")), EMPLOYEE_EMAIL))
+        assertThatThrownBy(() -> service.transfer(request(new BigDecimal("10.00")), new AuthContext(EMPLOYEE_EMAIL, true)))
                 .isInstanceOf(BusinessRuleException.class)
                 .hasMessageContaining("customer");
 
@@ -251,7 +252,7 @@ class TransactionServiceTest {
         when(accountRepository.findById(FROM)).thenReturn(Optional.of(source));
         when(accountRepository.findById(TO)).thenReturn(Optional.of(destination));
 
-        assertThatThrownBy(() -> service.transfer(request(new BigDecimal("10.00")), EMPLOYEE_EMAIL))
+        assertThatThrownBy(() -> service.transfer(request(new BigDecimal("10.00")), new AuthContext(EMPLOYEE_EMAIL, true)))
                 .isInstanceOf(BusinessRuleException.class)
                 .hasMessageContaining("currency");
 
@@ -265,7 +266,7 @@ class TransactionServiceTest {
         when(accountRepository.findById(FROM)).thenReturn(Optional.of(source));
         when(accountRepository.findById(TO)).thenReturn(Optional.of(destination));
 
-        assertThatThrownBy(() -> service.transfer(request(new BigDecimal("100.00")), EMPLOYEE_EMAIL))
+        assertThatThrownBy(() -> service.transfer(request(new BigDecimal("100.00")), new AuthContext(EMPLOYEE_EMAIL, true)))
                 .isInstanceOf(BusinessRuleException.class)
                 .hasMessageContaining("absolute limit");
 
@@ -280,7 +281,7 @@ class TransactionServiceTest {
         when(transactionRepository.sumDailyMovementsSince(eq(FROM), any(LocalDateTime.class)))
                 .thenReturn(new BigDecimal("150.00"));
 
-        assertThatThrownBy(() -> service.transfer(request(new BigDecimal("100.00")), EMPLOYEE_EMAIL))
+        assertThatThrownBy(() -> service.transfer(request(new BigDecimal("100.00")), new AuthContext(EMPLOYEE_EMAIL, true)))
                 .isInstanceOf(BusinessRuleException.class)
                 .hasMessageContaining("daily transfer limit");
 
@@ -301,7 +302,7 @@ class TransactionServiceTest {
         when(transactionMapper.toResponseDto(any(Transaction.class), eq(employee)))
                 .thenReturn(TransactionResponseDTO.builder().id(1L).type(TransactionType.WITHDRAWAL).build());
 
-        service.withdraw(atm(FROM, new BigDecimal("100.00")), EMPLOYEE_EMAIL);
+        service.withdraw(atm(FROM, new BigDecimal("100.00")), new AuthContext(EMPLOYEE_EMAIL, true));
 
         assertThat(source.getBalance()).isEqualByComparingTo("400.00");
 
@@ -319,7 +320,7 @@ class TransactionServiceTest {
         source.setBalance(new BigDecimal("50.00"));
         when(accountRepository.findById(FROM)).thenReturn(Optional.of(source));
 
-        assertThatThrownBy(() -> service.withdraw(atm(FROM, new BigDecimal("100.00")), EMPLOYEE_EMAIL))
+        assertThatThrownBy(() -> service.withdraw(atm(FROM, new BigDecimal("100.00")), new AuthContext(EMPLOYEE_EMAIL, true)))
                 .isInstanceOf(BusinessRuleException.class)
                 .hasMessageContaining("absolute limit");
 
@@ -333,7 +334,7 @@ class TransactionServiceTest {
         when(transactionRepository.sumDailyMovementsSince(eq(FROM), any()))
                 .thenReturn(new BigDecimal("150.00"));
 
-        assertThatThrownBy(() -> service.withdraw(atm(FROM, new BigDecimal("100.00")), EMPLOYEE_EMAIL))
+        assertThatThrownBy(() -> service.withdraw(atm(FROM, new BigDecimal("100.00")), new AuthContext(EMPLOYEE_EMAIL, true)))
                 .isInstanceOf(BusinessRuleException.class)
                 .hasMessageContaining("daily transfer limit");
 
@@ -344,7 +345,7 @@ class TransactionServiceTest {
     void withdraw_rejectsWhenAccountMissing() {
         when(accountRepository.findById(FROM)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> service.withdraw(atm(FROM, new BigDecimal("10.00")), EMPLOYEE_EMAIL))
+        assertThatThrownBy(() -> service.withdraw(atm(FROM, new BigDecimal("10.00")), new AuthContext(EMPLOYEE_EMAIL, true)))
                 .isInstanceOf(BusinessRuleException.class)
                 .hasMessageContaining("Account not found");
     }
@@ -363,7 +364,7 @@ class TransactionServiceTest {
         when(transactionMapper.toResponseDto(any(Transaction.class), eq(employee)))
                 .thenReturn(TransactionResponseDTO.builder().id(2L).type(TransactionType.DEPOSIT).build());
 
-        service.deposit(atm(FROM, new BigDecimal("75.00")), EMPLOYEE_EMAIL);
+        service.deposit(atm(FROM, new BigDecimal("75.00")), new AuthContext(EMPLOYEE_EMAIL, true));
 
         assertThat(source.getBalance()).isEqualByComparingTo("575.00");
 
@@ -383,7 +384,7 @@ class TransactionServiceTest {
         when(transactionRepository.sumDailyMovementsSince(eq(FROM), any()))
                 .thenReturn(new BigDecimal("150.00"));
 
-        assertThatThrownBy(() -> service.deposit(atm(FROM, new BigDecimal("100.00")), EMPLOYEE_EMAIL))
+        assertThatThrownBy(() -> service.deposit(atm(FROM, new BigDecimal("100.00")), new AuthContext(EMPLOYEE_EMAIL, true)))
                 .isInstanceOf(BusinessRuleException.class)
                 .hasMessageContaining("daily transfer limit");
 
@@ -395,7 +396,7 @@ class TransactionServiceTest {
         source.setType(AccountType.SAVINGS);
         when(accountRepository.findById(FROM)).thenReturn(Optional.of(source));
 
-        assertThatThrownBy(() -> service.deposit(atm(FROM, new BigDecimal("50.00")), EMPLOYEE_EMAIL))
+        assertThatThrownBy(() -> service.deposit(atm(FROM, new BigDecimal("50.00")), new AuthContext(EMPLOYEE_EMAIL, true)))
                 .isInstanceOf(BusinessRuleException.class)
                 .hasMessageContaining("checking");
 
@@ -426,7 +427,7 @@ class TransactionServiceTest {
         when(transactionMapper.toResponseDto(eq(tx))).thenReturn(dto);
 
         Page<TransactionResponseDTO> result = service.findAll(
-                new TransactionFilterDTO(), pageable, CUSTOMER_EMAIL, false);
+                new TransactionFilterDTO(), pageable, new AuthContext(CUSTOMER_EMAIL, false));
 
         assertThat(result.getContent()).containsExactly(dto);
         verify(transactionRepository).findAllFiltered(
@@ -445,7 +446,7 @@ class TransactionServiceTest {
         TransactionFilterDTO filter = new TransactionFilterDTO();
         filter.setIban("NL99SOMEONEELSE0000");
 
-        Page<TransactionResponseDTO> result = service.findAll(filter, pageable, CUSTOMER_EMAIL, false);
+        Page<TransactionResponseDTO> result = service.findAll(filter, pageable, new AuthContext(CUSTOMER_EMAIL, false));
 
         assertThat(result.isEmpty()).isTrue();
         verifyNoInteractions(transactionRepository);
@@ -463,7 +464,7 @@ class TransactionServiceTest {
         TransactionFilterDTO filter = new TransactionFilterDTO();
         filter.setInitiatedBy(targetUserId);
 
-        Page<TransactionResponseDTO> result = service.findAll(filter, pageable, "employee@bankie.nl", true);
+        Page<TransactionResponseDTO> result = service.findAll(filter, pageable, new AuthContext("employee@bankie.nl", true));
 
         assertThat(result.isEmpty()).isTrue();
         verify(transactionRepository).findAllFiltered(

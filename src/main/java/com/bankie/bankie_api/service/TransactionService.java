@@ -1,5 +1,6 @@
 package com.bankie.bankie_api.service;
 
+import com.bankie.bankie_api.dto.AuthContext;
 import com.bankie.bankie_api.dto.request.AtmRequestDTO;
 import com.bankie.bankie_api.dto.request.TransactionFilterDTO;
 import com.bankie.bankie_api.dto.request.TransferRequestDTO;
@@ -41,13 +42,17 @@ public class TransactionService {
     private final TransactionMapper transactionMapper;
     private final TransactionPolicy policy;
 
-    public Page<TransactionResponseDTO> findAll(TransactionFilterDTO filter, Pageable pageable,
-                                                String email, boolean isEmployee) {
+    public Page<TransactionResponseDTO> findAll(TransactionFilterDTO filter, Pageable pageable, AuthContext authContext) {
         List<String> ownerIbans = null;
         Long initiatedBy = filter.getInitiatedBy();
 
-        if (!isEmployee) {
-            User currentUser = userRepository.findByEmail(email)
+        if (authContext.isEmployee()) {
+            if (filter.getCustomerId() != null) {
+                ownerIbans = ibansOfCustomer(filter.getCustomerId());
+                if (ownerIbans.isEmpty()) return Page.empty(pageable);
+            }
+        } else {
+            User currentUser = userRepository.findByEmail(authContext.email())
                     .orElseThrow(() -> new EntityNotFoundException("User not found"));
 
             ownerIbans = accountRepository.findByUser(currentUser).stream()
@@ -55,6 +60,9 @@ public class TransactionService {
                     .toList();
 
             if (filter.getIban() != null && ownerIbans.stream().noneMatch(i -> i.equalsIgnoreCase(filter.getIban()))) {
+                return Page.empty(pageable);
+            }
+            if (filter.getCustomerId() != null && !filter.getCustomerId().equals(currentUser.getId())) {
                 return Page.empty(pageable);
             }
 
@@ -65,25 +73,18 @@ public class TransactionService {
                 initiatedBy, ownerIbans, filter.getType(), filter.getIban(),
                 filter.getStart(), filter.getEnd(), filter.getMinAmount(), filter.getMaxAmount(), pageable);
 
-        return transactions.map(transactionMapper::toResponseDto);
+        return mapWithInitiatorNames(transactions);
     }
 
-    public Page<TransactionResponseDTO> findByCustomer(Long customerId, Pageable pageable) {
+    private List<String> ibansOfCustomer(Long customerId) {
         User customer = userRepository.findById(customerId)
                 .filter(u -> u.getRole() == Role.CUSTOMER)
                 .orElseThrow(() -> new CustomerNotFoundException(customerId));
-
-        List<String> ibans = accountRepository.findByUser(customer).stream()
-                .map(Account::getIban)
-                .toList();
-
-        if (ibans.isEmpty()) return Page.empty(pageable);
-
-        return mapWithInitiatorNames(transactionRepository.findByIbanIn(ibans, pageable));
+        return accountRepository.findByUser(customer).stream().map(Account::getIban).toList();
     }
 
     @Transactional
-    public TransactionResponseDTO transfer(TransferRequestDTO request, String initiatorEmail) {
+    public TransactionResponseDTO transfer(TransferRequestDTO request, AuthContext authContext) {
         policy.requireDifferentAccounts(request.getFromIban(), request.getToIban());
 
         Account source = accountRepository.findById(request.getFromIban())
@@ -100,7 +101,7 @@ public class TransactionService {
         policy.requireWithinAbsoluteLimit(source, newBalance, "Transfer");
         policy.requireWithinDailyLimit(source, amount, dailyMovements(source), "Transfer");
 
-        User initiator = resolveInitiator(initiatorEmail);
+        User initiator = resolveInitiator(authContext.email());
 
         source.setBalance(newBalance);
         destination.setBalance(destination.getBalance().add(amount));
@@ -114,7 +115,7 @@ public class TransactionService {
     }
 
     @Transactional
-    public TransactionResponseDTO withdraw(AtmRequestDTO request, String initiatorEmail) {
+    public TransactionResponseDTO withdraw(AtmRequestDTO request, AuthContext authContext) {
         Account account = accountRepository.findById(request.getIban())
                 .orElseThrow(() -> new BusinessRuleException("Account not found"));
         policy.requireActiveCustomerChecking(account, "Account");
@@ -124,7 +125,7 @@ public class TransactionService {
         policy.requireWithinAbsoluteLimit(account, newBalance, "Withdrawal");
         policy.requireWithinDailyLimit(account, amount, dailyMovements(account), "Withdrawal");
 
-        User initiator = resolveInitiator(initiatorEmail);
+        User initiator = resolveInitiator(authContext.email());
         account.setBalance(newBalance);
         accountRepository.save(account);
 
@@ -135,7 +136,7 @@ public class TransactionService {
     }
 
     @Transactional
-    public TransactionResponseDTO deposit(AtmRequestDTO request, String initiatorEmail) {
+    public TransactionResponseDTO deposit(AtmRequestDTO request, AuthContext authContext) {
         Account account = accountRepository.findById(request.getIban())
                 .orElseThrow(() -> new BusinessRuleException("Account not found"));
         policy.requireActiveCustomerChecking(account, "Account");
@@ -143,7 +144,7 @@ public class TransactionService {
         BigDecimal amount = request.getAmount();
         policy.requireWithinDailyLimit(account, amount, dailyMovements(account), "Deposit");
 
-        User initiator = resolveInitiator(initiatorEmail);
+        User initiator = resolveInitiator(authContext.email());
         account.setBalance(account.getBalance().add(amount));
         accountRepository.save(account);
 
@@ -167,6 +168,10 @@ public class TransactionService {
                 .map(Transaction::getInitiatedBy)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
+
+        if (userIds.isEmpty()) {
+            return page.map(transactionMapper::toResponseDto);
+        }
 
         Map<Long, String> names = userRepository.findAllById(userIds).stream()
                 .collect(Collectors.toMap(User::getId, u -> u.getFirstName() + " " + u.getLastName()));

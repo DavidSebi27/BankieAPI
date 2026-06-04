@@ -13,6 +13,7 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 public class TransactionFilterDTO {
     private Long initiatedBy;
+    private Long customerId;
     private TransactionType type;
     private String iban;
     private LocalDateTime start;

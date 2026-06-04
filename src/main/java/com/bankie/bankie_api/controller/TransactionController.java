@@ -1,5 +1,6 @@
 package com.bankie.bankie_api.controller;
 
+import com.bankie.bankie_api.dto.AuthContext;
 import com.bankie.bankie_api.dto.request.AtmRequestDTO;
 import com.bankie.bankie_api.dto.request.TransactionFilterDTO;
 import com.bankie.bankie_api.dto.request.TransferRequestDTO;
@@ -15,7 +16,6 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -35,32 +35,27 @@ public class TransactionController {
             @ParameterObject TransactionFilterDTO filter,
             @ParameterObject @PageableDefault(size = 20, sort = "timestamp", direction = Sort.Direction.DESC) Pageable pageable,
             Authentication authentication) {
-
-        String email = authentication.getName();
-        boolean isEmployee = authentication.getAuthorities().stream()
-                .anyMatch(a -> a.getAuthority().equals("ROLE_EMPLOYEE"));
-
-        return ResponseEntity.ok(transactionService.findAll(filter, pageable, email, isEmployee));
+        return ResponseEntity.ok(transactionService.findAll(filter, pageable, AuthContext.from(authentication)));
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public TransactionResponseDTO transfer(@Valid @RequestBody TransferRequestDTO request,
-                                           @AuthenticationPrincipal String initiatorEmail) {
-        return transactionService.transfer(request, initiatorEmail);
+                                           Authentication authentication) {
+        return transactionService.transfer(request, AuthContext.from(authentication));
     }
 
     @PostMapping("/withdraw")
     @ResponseStatus(HttpStatus.CREATED)
     public TransactionResponseDTO withdraw(@Valid @RequestBody AtmRequestDTO request,
-                                           @AuthenticationPrincipal String initiatorEmail) {
-        return transactionService.withdraw(request, initiatorEmail);
+                                           Authentication authentication) {
+        return transactionService.withdraw(request, AuthContext.from(authentication));
     }
 
     @PostMapping("/deposit")
     @ResponseStatus(HttpStatus.CREATED)
     public TransactionResponseDTO deposit(@Valid @RequestBody AtmRequestDTO request,
-                                          @AuthenticationPrincipal String initiatorEmail) {
-        return transactionService.deposit(request, initiatorEmail);
+                                          Authentication authentication) {
+        return transactionService.deposit(request, AuthContext.from(authentication));
     }
 }
