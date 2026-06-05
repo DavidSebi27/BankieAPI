@@ -106,7 +106,7 @@ class AccountPolicyTest {
     void requireAbsoluteLimitPresent_throwsForNull() {
         assertThatThrownBy(() -> policy.requireAbsoluteLimitPresent(null))
                 .isInstanceOf(BusinessRuleException.class)
-                .hasMessageContaining("absoluteLimit is required");
+                .hasMessageContaining("Absolute limit is required");
     }
 
     // requireDailyLimitPresent
@@ -120,7 +120,7 @@ class AccountPolicyTest {
     void requireDailyLimitPresent_throwsForNull() {
         assertThatThrownBy(() -> policy.requireDailyLimitPresent(null))
                 .isInstanceOf(BusinessRuleException.class)
-                .hasMessageContaining("dailyTransferLimit is required");
+                .hasMessageContaining("Daily transfer limit is required");
     }
 
     // requireAccountNotClosed

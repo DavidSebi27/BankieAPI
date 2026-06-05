@@ -38,13 +38,13 @@ public class AccountPolicy {
 
     public void requireAbsoluteLimitPresent(BigDecimal absoluteLimit) {
         if (absoluteLimit == null) {
-            throw new BusinessRuleException("absoluteLimit is required");
+            throw new BusinessRuleException("Absolute limit is required");
         }
     }
 
     public void requireDailyLimitPresent(BigDecimal dailyLimit) {
         if (dailyLimit == null) {
-            throw new BusinessRuleException("dailyTransferLimit is required");
+            throw new BusinessRuleException("Daily transfer limit is required");
         }
     }
 
