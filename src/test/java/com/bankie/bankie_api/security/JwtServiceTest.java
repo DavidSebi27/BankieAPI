@@ -23,8 +23,8 @@ class JwtServiceTest {
     void generatedTokenContainsUserClaims() {
         Claims claims = jwtService.parse(jwtService.generate(sampleUser()));
 
-        assertThat(claims.getSubject()).isEqualTo("alice@bankie.nl");
-        assertThat(((Number) claims.get("userId")).longValue()).isEqualTo(7L);
+        assertThat(claims.getSubject()).isEqualTo("7");
+        assertThat(claims.get("email", String.class)).isEqualTo("alice@bankie.nl");
         assertThat(claims.get("role", String.class)).isEqualTo("CUSTOMER");
         assertThat(claims.getExpiration()).isAfter(claims.getIssuedAt());
     }

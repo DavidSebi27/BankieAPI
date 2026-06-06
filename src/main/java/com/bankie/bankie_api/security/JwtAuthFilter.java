@@ -33,7 +33,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         if (header != null && header.startsWith("Bearer ")) {
             try {
                 Claims claims = jwtService.parse(header.substring(7));
-                userRepository.findByEmail(claims.getSubject())
+                userRepository.findById(Long.parseLong(claims.getSubject()))
                         .filter(User::isApproved)
                         .ifPresent(user -> {
                             var auth = new UsernamePasswordAuthenticationToken(
@@ -42,7 +42,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                                     List.of(new SimpleGrantedAuthority("ROLE_" + user.getRole().name())));
                             SecurityContextHolder.getContext().setAuthentication(auth);
                         });
-            } catch (JwtException ignored) {
+            } catch (JwtException | NumberFormatException ignored) {
                 SecurityContextHolder.clearContext();
             }
         }

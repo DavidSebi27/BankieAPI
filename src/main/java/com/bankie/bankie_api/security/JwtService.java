@@ -27,8 +27,8 @@ public class JwtService {
     public String generate(User user) {
         Instant now = Instant.now();
         return Jwts.builder()
-                .subject(user.getEmail())
-                .claim("userId", user.getId())
+                .subject(String.valueOf(user.getId()))
+                .claim("email", user.getEmail())
                 .claim("role", user.getRole().name())
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(now.plusMillis(expirationMs)))

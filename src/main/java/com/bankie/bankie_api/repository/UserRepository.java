@@ -14,7 +14,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByEmail(String email);
     boolean existsByEmail(String email);
     boolean existsByBsn(String bsn);
-    Page findAll(Pageable pageable);
     Page<User> findAllByApproved(boolean approved, Pageable pageable);
 
     @Query("SELECT u FROM User u WHERE u.role = :role AND u.approved = false AND u.id NOT IN (SELECT a.user.id FROM Account a)")
