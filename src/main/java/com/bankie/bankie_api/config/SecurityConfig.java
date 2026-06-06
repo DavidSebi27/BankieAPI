@@ -85,6 +85,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/transactions").authenticated()
                         .requestMatchers(HttpMethod.POST, "/transactions", "/transactions/withdraw", "/transactions/deposit")
                             .hasAnyRole("CUSTOMER", "EMPLOYEE")
+                        .requestMatchers("/users/me").authenticated()
                         .requestMatchers("/transactions/**", "/users/**").hasRole("EMPLOYEE")
                         .anyRequest().authenticated())
                 .exceptionHandling(eh -> eh

@@ -30,11 +30,6 @@ public class UserService {
                 .orElseThrow(() -> new EntityNotFoundException("User not found"));
     }
 
-    public User findById(Long id) {
-        return userRepository.findById(id)
-                .orElseThrow(() -> new EntityNotFoundException("User not found"));
-    }
-
     public UserResponseDTO getProfile(String email) {
         return userMapper.toResponseDto(findByEmail(email));
     }

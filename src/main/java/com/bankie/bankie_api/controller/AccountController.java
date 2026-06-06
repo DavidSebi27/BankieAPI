@@ -58,7 +58,6 @@ public class AccountController {
         return ResponseEntity.ok(accountService.verifyRecipient(request));
     }
 
-
     @GetMapping("/customers/{customerId}/accounts")
     @PreAuthorize("hasRole('EMPLOYEE')")
     public ResponseEntity<Page<AccountResponseDTO>> getAccountsByCustomer(
