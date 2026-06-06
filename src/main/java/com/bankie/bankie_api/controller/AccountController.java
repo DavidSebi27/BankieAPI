@@ -1,7 +1,6 @@
 package com.bankie.bankie_api.controller;
 
-import com.bankie.bankie_api.dto.request.SetAbsoluteLimitRequestDTO;
-import com.bankie.bankie_api.dto.request.SetDailyLimitRequestDTO;
+import com.bankie.bankie_api.dto.request.UpdateLimitsRequestDTO;
 import com.bankie.bankie_api.dto.response.AccountResponseDTO;
 import com.bankie.bankie_api.dto.response.SearchAccountResponseDTO;
 import com.bankie.bankie_api.entity.Account;
@@ -59,19 +58,11 @@ public class AccountController {
         return ResponseEntity.ok(accountMapper.toResponseDto(accountService.closeAccount(iban)));
     }
 
-    @PatchMapping("/{iban}/absolute-limit")
+    @PatchMapping("/{iban}/limits")
     @PreAuthorize("hasRole('EMPLOYEE')")
-    public ResponseEntity<AccountResponseDTO> updateAbsoluteLimit(
+    public ResponseEntity<AccountResponseDTO> updateLimits(
             @PathVariable String iban,
-            @RequestBody SetAbsoluteLimitRequestDTO dto) {
-        return ResponseEntity.ok(accountMapper.toResponseDto(accountService.updateAbsoluteLimit(iban, dto)));
-    }
-
-    @PatchMapping("/{iban}/daily-limit")
-    @PreAuthorize("hasRole('EMPLOYEE')")
-    public ResponseEntity<AccountResponseDTO> updateDailyLimit(
-            @PathVariable String iban,
-            @RequestBody SetDailyLimitRequestDTO dto) {
-        return ResponseEntity.ok(accountMapper.toResponseDto(accountService.updateDailyTransferLimit(iban, dto)));
+            @RequestBody UpdateLimitsRequestDTO dto) {
+        return ResponseEntity.ok(accountMapper.toResponseDto(accountService.updateLimits(iban, dto)));
     }
 }

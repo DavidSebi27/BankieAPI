@@ -1,8 +1,7 @@
 package com.bankie.bankie_api.service;
 
 import com.bankie.bankie_api.dto.request.CreateAccountRequestDTO;
-import com.bankie.bankie_api.dto.request.SetAbsoluteLimitRequestDTO;
-import com.bankie.bankie_api.dto.request.SetDailyLimitRequestDTO;
+import com.bankie.bankie_api.dto.request.UpdateLimitsRequestDTO;
 import com.bankie.bankie_api.entity.Account;
 import com.bankie.bankie_api.entity.User;
 import com.bankie.bankie_api.enums.AccountStatus;
@@ -38,29 +37,19 @@ public class AccountService {
     private BigDecimal defaultDailyLimit;
 
     public Page<Account> getAccountsForUser(Authentication auth, Pageable pageable) {
-        boolean isEmployee = auth.getAuthorities().stream()
-                .anyMatch(a -> a.getAuthority().equals("ROLE_EMPLOYEE"));
-
-        if (isEmployee) {
+        if (isEmployee(auth)) {
             return accountRepository.findAll(pageable);
         }
-
         User user = userRepository.findByEmail(auth.getName())
                 .orElseThrow(() -> new EntityNotFoundException("User not found"));
-
         return accountRepository.findByUserId(user.getId(), pageable);
     }
 
     public Page<Account> searchAccounts(String firstName, String lastName, Pageable pageable, Authentication auth) {
-        boolean isEmployee = auth.getAuthorities().stream()
-                .anyMatch(a -> a.getAuthority().equals("ROLE_EMPLOYEE"));
-        Page<Account> results = accountRepository.searchByOwnerNames(firstName, lastName, pageable);
-
-        if (!isEmployee) {
+        if (!isEmployee(auth)) {
             return accountRepository.searchApprovedByOwnerNames(firstName, lastName, pageable);
         }
-
-        return results;
+        return accountRepository.searchByOwnerNames(firstName, lastName, pageable);
     }
 
     @Transactional(readOnly = true)
@@ -79,16 +68,22 @@ public class AccountService {
                 .orElseThrow(() -> new AccountNotFoundException(normalizedIban));
     }
 
-    private static boolean equalsTrimCi(String a, String b) {
-        return a != null && b != null && a.trim().equalsIgnoreCase(b.trim());
-    }
-
     public Page<User> getCustomersWithoutAccounts(Pageable pageable) {
         return userRepository.findByRoleAndNoAccounts(Role.CUSTOMER, pageable);
     }
 
     public Page<User> getCustomersWithAllAccountsClosed(Pageable pageable) {
         return userRepository.findByRoleAndAllAccountsClosed(Role.CUSTOMER, pageable);
+    }
+
+    public Page<User> getAllCustomers(Pageable pageable) {
+        return userRepository.findAllByRole(Role.CUSTOMER, pageable);
+    }
+
+    public Page<Account> getAccountsByCustomer(Long customerId, Pageable pageable) {
+        User user = userRepository.findById(customerId)
+                .orElseThrow(() -> new CustomerNotFoundException(customerId));
+        return accountRepository.findByUserId(user.getId(), pageable);
     }
 
     @Transactional
@@ -99,11 +94,9 @@ public class AccountService {
         if (user.getRole() != Role.CUSTOMER) {
             throw new BusinessRuleException("Only customers can be approved");
         }
-
         if (accountRepository.existsByUser(user)) {
             throw new BusinessRuleException("Customer already has accounts");
         }
-
         if (dto.getAbsoluteLimit() != null && dto.getAbsoluteLimit().compareTo(BigDecimal.ZERO) > 0) {
             throw new BusinessRuleException("Absolute limit cannot be positive");
         }
@@ -155,40 +148,37 @@ public class AccountService {
     }
 
     @Transactional
-    public Account updateAbsoluteLimit(String iban, SetAbsoluteLimitRequestDTO dto) {
+    public Account updateLimits(String iban, UpdateLimitsRequestDTO dto) {
         Account account = accountRepository.findById(iban)
                 .orElseThrow(() -> new AccountNotFoundException(iban));
-        if (dto.getAbsoluteLimit() == null) {
-            throw new BusinessRuleException("absoluteLimit is required");
+
+        if (dto.getAbsoluteLimit() != null) {
+            if (dto.getAbsoluteLimit().compareTo(BigDecimal.ZERO) > 0) {
+                throw new BusinessRuleException("Absolute limit cannot be positive");
+            }
+            account.setAbsoluteLimit(dto.getAbsoluteLimit());
         }
-        if (dto.getAbsoluteLimit().compareTo(BigDecimal.ZERO) > 0) {
-            throw new BusinessRuleException("Absolute limit cannot be positive");
+
+        if (dto.getDailyTransferLimit() != null) {
+            if (dto.getDailyTransferLimit().compareTo(BigDecimal.ZERO) < 0) {
+                throw new BusinessRuleException("dailyTransferLimit cannot be negative");
+            }
+            account.setDailyTransferLimit(dto.getDailyTransferLimit());
         }
-        account.setAbsoluteLimit(dto.getAbsoluteLimit());
+
+        if (dto.getAbsoluteLimit() == null && dto.getDailyTransferLimit() == null) {
+            throw new BusinessRuleException("At least one of absoluteLimit or dailyTransferLimit must be provided");
+        }
+
         return accountRepository.save(account);
     }
 
-    @Transactional
-    public Account updateDailyTransferLimit(String iban, SetDailyLimitRequestDTO dto) {
-        Account account = accountRepository.findById(iban)
-                .orElseThrow(() -> new AccountNotFoundException(iban));
-        if (dto.getDailyTransferLimit() == null) {
-            throw new BusinessRuleException("dailyTransferLimit is required");
-        }
-        if (dto.getDailyTransferLimit().compareTo(BigDecimal.ZERO) < 0) {
-            throw new BusinessRuleException("dailyTransferLimit cannot be negative");
-        }
-        account.setDailyTransferLimit(dto.getDailyTransferLimit());
-        return accountRepository.save(account);
+    private boolean isEmployee(Authentication auth) {
+        return auth.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_EMPLOYEE"));
     }
 
-    public Page<User> getAllCustomers(Pageable pageable) {
-        return userRepository.findAllByRole(Role.CUSTOMER, pageable);
-    }
-
-    public Page<Account> getAccountsByCustomer(Long customerId, Pageable pageable) {
-        User user = userRepository.findById(customerId)
-                .orElseThrow(() -> new CustomerNotFoundException(customerId));
-        return accountRepository.findByUserId(user.getId(), pageable);
+    private static boolean equalsTrimCi(String a, String b) {
+        return a != null && b != null && a.trim().equalsIgnoreCase(b.trim());
     }
 }
