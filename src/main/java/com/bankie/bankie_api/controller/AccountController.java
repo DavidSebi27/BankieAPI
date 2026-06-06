@@ -1,7 +1,6 @@
 package com.bankie.bankie_api.controller;
 
 import com.bankie.bankie_api.dto.AuthContext;
-import com.bankie.bankie_api.dto.PageResponse;
 import com.bankie.bankie_api.dto.request.AccountSearchFilterDTO;
 import com.bankie.bankie_api.dto.request.CreateAccountRequestDTO;
 import com.bankie.bankie_api.dto.request.SetAbsoluteLimitRequestDTO;
@@ -9,7 +8,6 @@ import com.bankie.bankie_api.dto.request.SetDailyLimitRequestDTO;
 import com.bankie.bankie_api.dto.request.VerifyRecipientRequestDTO;
 import com.bankie.bankie_api.dto.response.AccountResponseDTO;
 import com.bankie.bankie_api.dto.response.SearchAccountResponseDTO;
-import com.bankie.bankie_api.dto.response.UserResponseDTO;
 import com.bankie.bankie_api.service.AccountService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -60,19 +58,6 @@ public class AccountController {
         return ResponseEntity.ok(accountService.verifyRecipient(request));
     }
 
-    @GetMapping("/customers/without-accounts")
-    @PreAuthorize("hasRole('EMPLOYEE')")
-    public ResponseEntity<PageResponse<UserResponseDTO>> getCustomersWithoutAccounts(
-            @ParameterObject @PageableDefault(size = 20) Pageable pageable) {
-        return ResponseEntity.ok(PageResponse.from(accountService.getCustomersWithoutAccounts(pageable)));
-    }
-
-    @GetMapping("/customers/all-accounts-closed")
-    @PreAuthorize("hasRole('EMPLOYEE')")
-    public ResponseEntity<PageResponse<UserResponseDTO>> getCustomersWithAllAccountsClosed(
-            @ParameterObject @PageableDefault(size = 20) Pageable pageable) {
-        return ResponseEntity.ok(PageResponse.from(accountService.getCustomersWithAllAccountsClosed(pageable)));
-    }
 
     @GetMapping("/customers/{customerId}/accounts")
     @PreAuthorize("hasRole('EMPLOYEE')")
