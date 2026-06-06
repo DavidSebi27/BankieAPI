@@ -15,6 +15,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -28,8 +29,8 @@ public class UserController {
     @GetMapping
     @PreAuthorize("hasRole('EMPLOYEE')")
     @Operation(
-            summary = "List all users (employee only)",
-            description = "Returns a paginated list of all customers. Use approved=false to find customers awaiting account creation."
+            summary = "List users (employee only)",
+            description = "Returns a paginated list of users. Use status=no-accounts for customers without accounts, status=all-closed for customers with all accounts closed."
     )
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Paginated list of users."),
@@ -37,8 +38,9 @@ public class UserController {
             @ApiResponse(responseCode = "403", description = "Authenticated user does not have the EMPLOYEE role.")
     })
     public ResponseEntity<PageResponse<UserResponseDTO>> getAllUsers(
+            @RequestParam(required = false) String status,
             @ParameterObject UserFilterDTO filter,
             @ParameterObject Pageable pageable) {
-        return ResponseEntity.ok(PageResponse.from(userService.findAll(filter, pageable)));
+        return ResponseEntity.ok(PageResponse.from(userService.findAll(status, filter, pageable)));
     }
 }
