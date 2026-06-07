@@ -127,12 +127,16 @@ public class TransactionService {
                 .orElseThrow(() -> new BusinessRuleException("Account not found"));
         policy.requireActiveCustomerChecking(account, "Account");
 
+        User initiator = resolveInitiator(authContext.email());
+        if (!authContext.isEmployee()) {
+            policy.requireOwnership(account, initiator, "Account");
+        }
+
         BigDecimal amount = request.getAmount();
         BigDecimal newBalance = account.getBalance().subtract(amount);
         policy.requireWithinAbsoluteLimit(account, newBalance, "Withdrawal");
         policy.requireWithinDailyLimit(account, amount, dailyMovements(account), "Withdrawal");
 
-        User initiator = resolveInitiator(authContext.email());
         account.setBalance(newBalance);
         accountRepository.save(account);
 
@@ -148,10 +152,14 @@ public class TransactionService {
                 .orElseThrow(() -> new BusinessRuleException("Account not found"));
         policy.requireActiveCustomerChecking(account, "Account");
 
+        User initiator = resolveInitiator(authContext.email());
+        if (!authContext.isEmployee()) {
+            policy.requireOwnership(account, initiator, "Account");
+        }
+
         BigDecimal amount = request.getAmount();
         policy.requireWithinDailyLimit(account, amount, dailyMovements(account), "Deposit");
 
-        User initiator = resolveInitiator(authContext.email());
         account.setBalance(account.getBalance().add(amount));
         accountRepository.save(account);
 
