@@ -341,6 +341,7 @@ class TransactionServiceTest {
     void withdraw_rejectsWhenBalanceWouldBreachAbsoluteLimit() {
         source.setBalance(new BigDecimal("50.00"));
         when(accountRepository.findById(FROM)).thenReturn(Optional.of(source));
+        when(userRepository.findByEmail(EMPLOYEE_EMAIL)).thenReturn(Optional.of(employee));
 
         assertThatThrownBy(() -> service.withdraw(atm(FROM, new BigDecimal("100.00")), new AuthContext(EMPLOYEE_EMAIL, true)))
                 .isInstanceOf(BusinessRuleException.class)
@@ -355,6 +356,7 @@ class TransactionServiceTest {
         when(accountRepository.findById(FROM)).thenReturn(Optional.of(source));
         when(transactionRepository.sumDailyMovementsSince(eq(FROM), any()))
                 .thenReturn(new BigDecimal("150.00"));
+        when(userRepository.findByEmail(EMPLOYEE_EMAIL)).thenReturn(Optional.of(employee));
 
         assertThatThrownBy(() -> service.withdraw(atm(FROM, new BigDecimal("100.00")), new AuthContext(EMPLOYEE_EMAIL, true)))
                 .isInstanceOf(BusinessRuleException.class)
@@ -370,6 +372,18 @@ class TransactionServiceTest {
         assertThatThrownBy(() -> service.withdraw(atm(FROM, new BigDecimal("10.00")), new AuthContext(EMPLOYEE_EMAIL, true)))
                 .isInstanceOf(BusinessRuleException.class)
                 .hasMessageContaining("Account not found");
+    }
+
+    @Test
+    void withdraw_rejectsWhenCustomerDoesNotOwnAccount() {
+        when(accountRepository.findById(FROM)).thenReturn(Optional.of(source)); // source owned by customer id 10
+        when(userRepository.findByEmail(CUSTOMER_EMAIL)).thenReturn(Optional.of(customerUser())); // initiator id 1
+
+        assertThatThrownBy(() -> service.withdraw(atm(FROM, new BigDecimal("10.00")), new AuthContext(CUSTOMER_EMAIL, false)))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessageContaining("do not own");
+
+        verify(transactionRepository, never()).save(any());
     }
 
     @Test
@@ -405,6 +419,7 @@ class TransactionServiceTest {
         when(accountRepository.findById(FROM)).thenReturn(Optional.of(source));
         when(transactionRepository.sumDailyMovementsSince(eq(FROM), any()))
                 .thenReturn(new BigDecimal("150.00"));
+        when(userRepository.findByEmail(EMPLOYEE_EMAIL)).thenReturn(Optional.of(employee));
 
         assertThatThrownBy(() -> service.deposit(atm(FROM, new BigDecimal("100.00")), new AuthContext(EMPLOYEE_EMAIL, true)))
                 .isInstanceOf(BusinessRuleException.class)

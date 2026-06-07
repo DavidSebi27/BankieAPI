@@ -24,6 +24,7 @@ import com.bankie.bankie_api.util.IbanGenerator;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -49,6 +50,9 @@ public class AccountService {
     // customerId = 123   → employee sees that specific customer's accounts
     public Page<AccountResponseDTO> getAccountsForUser(Long customerId, AuthContext authContext, Pageable pageable) {
         if (customerId != null) {
+            if (!authContext.isEmployee() && !customerId.equals(currentUserId(authContext.email()))) {
+                throw new AccessDeniedException("You may only view your own accounts");
+            }
             return accountRepository.findByUserId(customerId, pageable)
                     .map(accountMapper::toResponseDto);
         }
