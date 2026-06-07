@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface AccountRepository extends JpaRepository<Account, String> {
 
@@ -31,4 +32,14 @@ public interface AccountRepository extends JpaRepository<Account, String> {
     Page<Account> searchApprovedByOwnerNames(@Param("first") String firstName,
                                              @Param("last") String lastName,
                                              Pageable pageable);
+
+    @Query("SELECT a FROM Account a WHERE a.iban = :iban " +
+            "AND a.status = AccountStatus.ACTIVE " +
+            "AND a.user.role = Role.CUSTOMER " +
+            "AND a.user.approved = true " +
+            "AND LOWER(a.user.firstName) = LOWER(:first) " +
+            "AND LOWER(a.user.lastName) = LOWER(:last)")
+    Optional<Account> findVerifiedRecipient(@Param("iban") String iban,
+                                            @Param("first") String first,
+                                            @Param("last") String last);
 }

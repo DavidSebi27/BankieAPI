@@ -13,7 +13,6 @@ import com.bankie.bankie_api.entity.Account;
 import com.bankie.bankie_api.entity.User;
 import com.bankie.bankie_api.enums.AccountStatus;
 import com.bankie.bankie_api.enums.AccountType;
-import com.bankie.bankie_api.enums.Role;
 import com.bankie.bankie_api.exception.AccountNotFoundException;
 import com.bankie.bankie_api.exception.CustomerNotFoundException;
 import com.bankie.bankie_api.mapper.AccountMapper;
@@ -40,7 +39,6 @@ public class AccountService {
     private final AccountRepository accountRepository;
     private final UserRepository userRepository;
     private final AccountMapper accountMapper;
-    private final UserMapper userMapper;
     private final AccountPolicy accountPolicy;
     private final IbanGenerator ibanGenerator;
 
@@ -51,9 +49,7 @@ public class AccountService {
     // customerId = 123   → employee sees that specific customer's accounts
     public Page<AccountResponseDTO> getAccountsForUser(Long customerId, AuthContext authContext, Pageable pageable) {
         if (customerId != null) {
-            User user = userRepository.findById(customerId)
-                    .orElseThrow(() -> new CustomerNotFoundException(customerId));
-            return accountRepository.findByUserId(user.getId(), pageable)
+            return accountRepository.findByUserId(customerId, pageable)
                     .map(accountMapper::toResponseDto);
         }
 
@@ -77,13 +73,7 @@ public class AccountService {
         String inFirst = request.firstName().trim();
         String inLast = request.lastName().trim();
 
-        Account account = accountRepository.findById(normalizedIban)
-                .filter(a -> a.getStatus() == AccountStatus.ACTIVE)
-                .filter(a -> a.getUser() != null
-                        && a.getUser().getRole() == Role.CUSTOMER
-                        && a.getUser().isApproved())
-                .filter(a -> equalsTrimCi(a.getUser().getFirstName(), inFirst)
-                        && equalsTrimCi(a.getUser().getLastName(), inLast))
+        Account account = accountRepository.findVerifiedRecipient(normalizedIban, inFirst, inLast)
                 .orElseThrow(() -> new AccountNotFoundException(normalizedIban));
 
         return accountMapper.toSearchResponseDto(account);
@@ -159,7 +149,4 @@ public class AccountService {
                 .getId();
     }
 
-    private static boolean equalsTrimCi(String a, String b) {
-        return a != null && b != null && a.trim().equalsIgnoreCase(b.trim());
-    }
 }
