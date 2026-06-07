@@ -18,6 +18,9 @@ public class Account {
     @Id
     private String iban;
 
+    @Version
+    private Long version;
+
     @Enumerated(EnumType.STRING)
     private AccountType type;
 
