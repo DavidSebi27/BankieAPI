@@ -1,3 +1,9 @@
 jwt:
   secret: test-only-secret-not-used-in-prod-must-be-at-least-32-bytes
   expiration: 3600000
+
+bankie:
+  iban:
+    bank-code: INHO0
+  account:
+    default-daily-limit: 1000.00

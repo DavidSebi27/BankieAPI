@@ -1,18 +1,18 @@
 package com.bankie.bankie_api.service;
 
+import com.bankie.bankie_api.dto.AuthContext;
 import com.bankie.bankie_api.dto.request.AtmRequestDTO;
+import com.bankie.bankie_api.dto.request.TransactionFilterDTO;
 import com.bankie.bankie_api.dto.request.TransferRequestDTO;
 import com.bankie.bankie_api.dto.response.TransactionResponseDTO;
 import com.bankie.bankie_api.entity.Account;
 import com.bankie.bankie_api.entity.Transaction;
 import com.bankie.bankie_api.entity.User;
-import com.bankie.bankie_api.enums.AccountStatus;
-import com.bankie.bankie_api.enums.AccountType;
 import com.bankie.bankie_api.enums.Role;
-import com.bankie.bankie_api.enums.TransactionType;
 import com.bankie.bankie_api.exception.BusinessRuleException;
 import com.bankie.bankie_api.exception.CustomerNotFoundException;
 import com.bankie.bankie_api.mapper.TransactionMapper;
+import com.bankie.bankie_api.policy.TransactionPolicy;
 import com.bankie.bankie_api.repository.AccountRepository;
 import com.bankie.bankie_api.repository.TransactionRepository;
 import com.bankie.bankie_api.repository.UserRepository;
@@ -40,182 +40,129 @@ public class TransactionService {
     private final UserRepository userRepository;
     private final AccountRepository accountRepository;
     private final TransactionMapper transactionMapper;
+    private final TransactionPolicy policy;
 
-    public Page<TransactionResponseDTO> findAll(Long initiatedBy, TransactionType type, String iban,
-                                                LocalDateTime start, LocalDateTime end,
-                                                BigDecimal min, BigDecimal max,
-                                                Pageable pageable, String email, boolean isEmployee) {
+    public Page<TransactionResponseDTO> findAll(TransactionFilterDTO filter, Pageable pageable, AuthContext authContext) {
         List<String> ownerIbans = null;
+        Long initiatedBy = filter.getInitiatedBy();
 
-        if (!isEmployee) {
-            User currentUser = userRepository.findByEmail(email)
+        if (authContext.isEmployee()) {
+            if (filter.getCustomerId() != null) {
+                ownerIbans = ibansOfCustomer(filter.getCustomerId());
+                if (ownerIbans.isEmpty()) return Page.empty(pageable);
+            }
+        } else {
+            User currentUser = userRepository.findByEmail(authContext.email())
                     .orElseThrow(() -> new EntityNotFoundException("User not found"));
 
             ownerIbans = accountRepository.findByUser(currentUser).stream()
                     .map(Account::getIban)
                     .toList();
 
-            // Prevent a customer from filtering by an IBAN they don't own
-            if (iban != null && ownerIbans.stream().noneMatch(i -> i.equalsIgnoreCase(iban))) {
+            if (ownerIbans.isEmpty()) return Page.empty(pageable);
+
+            if (filter.getIban() != null && ownerIbans.stream().noneMatch(i -> i.equalsIgnoreCase(filter.getIban()))) {
+                return Page.empty(pageable);
+            }
+            if (filter.getCustomerId() != null && !filter.getCustomerId().equals(currentUser.getId())) {
                 return Page.empty(pageable);
             }
 
             initiatedBy = null;
         }
 
-        Page<Transaction> transactions = transactionRepository.findAllFiltered(initiatedBy, ownerIbans, type, iban, start, end, min, max, pageable);
+        Page<Transaction> transactions = transactionRepository.findAllFiltered(
+                initiatedBy, ownerIbans, filter.getType(), filter.getIban(),
+                filter.getStart(), filter.getEnd(), filter.getMinAmount(), filter.getMaxAmount(), pageable);
 
-        return transactions.map(tx -> {
-            // Extract names directly from the joined entities
-            String fromName = (tx.getFromAccount() != null)
-                    ? tx.getFromAccount().getUser().getFirstName() + " " + tx.getFromAccount().getUser().getLastName()
-                    : "External/ATM";
-
-            String toName = (tx.getToAccount() != null)
-                    ? tx.getToAccount().getUser().getFirstName() + " " + tx.getToAccount().getUser().getLastName()
-                    : "External/ATM";
-
-            return transactionMapper.toResponseDto(tx, fromName, toName);
-        });
+        return mapWithInitiatorNames(transactions);
     }
 
-    public Page<TransactionResponseDTO> findByCustomer(Long customerId, Pageable pageable) {
+    private List<String> ibansOfCustomer(Long customerId) {
         User customer = userRepository.findById(customerId)
                 .filter(u -> u.getRole() == Role.CUSTOMER)
                 .orElseThrow(() -> new CustomerNotFoundException(customerId));
-
-        List<String> ibans = accountRepository.findByUser(customer).stream()
-                .map(Account::getIban)
-                .toList();
-
-        if (ibans.isEmpty()) return Page.empty(pageable);
-
-        return mapWithNames(transactionRepository.findByIbanIn(ibans, pageable));
+        return accountRepository.findByUser(customer).stream().map(Account::getIban).toList();
     }
 
     @Transactional
-    public TransactionResponseDTO transfer(TransferRequestDTO request, String initiatorEmail) {
-        if (request.getFromIban().equals(request.getToIban())) {
-            throw new BusinessRuleException("Source and destination accounts must be different");
-        }
+    public TransactionResponseDTO transfer(TransferRequestDTO request, AuthContext authContext) {
+        policy.requireDifferentAccounts(request.getFromIban(), request.getToIban());
 
         Account source = accountRepository.findById(request.getFromIban())
                 .orElseThrow(() -> new BusinessRuleException("Source account not found"));
         Account destination = accountRepository.findById(request.getToIban())
                 .orElseThrow(() -> new BusinessRuleException("Destination account not found"));
 
-        User initiator = resolveInitiator(initiatorEmail);
+        User initiator = resolveInitiator(authContext.email());
 
-        boolean isEmployee = initiator.getRole() == Role.EMPLOYEE;
-        if (!isEmployee && (source.getUser() == null || !source.getUser().getId().equals(initiator.getId()))) {
-            throw new BusinessRuleException("You do not own the source account");
+        if (!authContext.isEmployee()) {
+            policy.requireOwnership(source, initiator, "Source");
         }
 
-        requireActiveCustomerOwned(source, "Source");
-        requireActiveCustomerOwned(destination, "Destination");
-
-        Long sourceOwnerId = source.getUser() != null ? source.getUser().getId() : null;
-        Long destOwnerId = destination.getUser() != null ? destination.getUser().getId() : null;
-        boolean isExternal = sourceOwnerId == null || destOwnerId == null || !sourceOwnerId.equals(destOwnerId);
-        if (isExternal) {
-            if (source.getType() != AccountType.CHECKING) {
-                throw new BusinessRuleException("External transfers must originate from a checking account");
-            }
-            if (destination.getType() != AccountType.CHECKING) {
-                throw new BusinessRuleException("External transfers must go to a checking account");
-            }
-        }
-
-        if (!Objects.equals(source.getCurrency(), destination.getCurrency())) {
-            throw new BusinessRuleException("Accounts must share the same currency");
-        }
+        policy.requireActiveCustomerOwned(source, "Source");
+        policy.requireActiveCustomerOwned(destination, "Destination");
+        policy.requireExternalTransferShape(source, destination);
+        policy.requireSameCurrency(source, destination);
 
         BigDecimal amount = request.getAmount();
         BigDecimal newBalance = source.getBalance().subtract(amount);
-        if (newBalance.compareTo(source.getAbsoluteLimit()) < 0) {
-            throw new BusinessRuleException("Transfer would breach the source account's absolute limit");
-        }
-
-        enforceDailyLimit(source, amount, "Transfer");
+        policy.requireWithinAbsoluteLimit(source, newBalance, "Transfer");
+        policy.requireWithinDailyLimit(source, amount, dailyMovements(source), "Transfer");
 
         source.setBalance(newBalance);
         destination.setBalance(destination.getBalance().add(amount));
         accountRepository.save(source);
         accountRepository.save(destination);
 
-        Transaction tx = transactionRepository.save(Transaction.builder()
-                .type(TransactionType.TRANSFER)
-                .fromIban(source.getIban())
-                .toIban(destination.getIban())
-                .amount(amount)
-                .currency(source.getCurrency())
-                .timestamp(LocalDateTime.now())
-                .initiatedBy(initiator.getId())
-                .build());
+        Transaction tx = transactionRepository.save(
+                transactionMapper.toTransferEntity(request, initiator.getId(), source.getCurrency()));
 
-        return toDto(tx, initiator);
+        return transactionMapper.toResponseDto(tx, initiator);
     }
 
     @Transactional
-    public TransactionResponseDTO withdraw(AtmRequestDTO request, String initiatorEmail) {
+    public TransactionResponseDTO withdraw(AtmRequestDTO request, AuthContext authContext) {
         Account account = accountRepository.findById(request.getIban())
                 .orElseThrow(() -> new BusinessRuleException("Account not found"));
-        requireActiveCustomerChecking(account, "Account");
+        policy.requireActiveCustomerChecking(account, "Account");
 
         BigDecimal amount = request.getAmount();
         BigDecimal newBalance = account.getBalance().subtract(amount);
-        if (newBalance.compareTo(account.getAbsoluteLimit()) < 0) {
-            throw new BusinessRuleException("Withdrawal would breach the account's absolute limit");
-        }
-        enforceDailyLimit(account, amount, "Withdrawal");
+        policy.requireWithinAbsoluteLimit(account, newBalance, "Withdrawal");
+        policy.requireWithinDailyLimit(account, amount, dailyMovements(account), "Withdrawal");
 
-        User initiator = resolveInitiator(initiatorEmail);
+        User initiator = resolveInitiator(authContext.email());
         account.setBalance(newBalance);
         accountRepository.save(account);
 
-        Transaction tx = transactionRepository.save(Transaction.builder()
-                .type(TransactionType.WITHDRAWAL)
-                .fromIban(account.getIban())
-                .amount(amount)
-                .currency(account.getCurrency())
-                .timestamp(LocalDateTime.now())
-                .initiatedBy(initiator.getId())
-                .build());
+        Transaction tx = transactionRepository.save(
+                transactionMapper.toWithdrawalEntity(request, initiator.getId(), account.getCurrency()));
 
-        return toDto(tx, initiator);
+        return transactionMapper.toResponseDto(tx, initiator);
     }
 
     @Transactional
-    public TransactionResponseDTO deposit(AtmRequestDTO request, String initiatorEmail) {
+    public TransactionResponseDTO deposit(AtmRequestDTO request, AuthContext authContext) {
         Account account = accountRepository.findById(request.getIban())
                 .orElseThrow(() -> new BusinessRuleException("Account not found"));
-        requireActiveCustomerChecking(account, "Account");
+        policy.requireActiveCustomerChecking(account, "Account");
 
         BigDecimal amount = request.getAmount();
-        enforceDailyLimit(account, amount, "Deposit");
+        policy.requireWithinDailyLimit(account, amount, dailyMovements(account), "Deposit");
 
-        User initiator = resolveInitiator(initiatorEmail);
+        User initiator = resolveInitiator(authContext.email());
         account.setBalance(account.getBalance().add(amount));
         accountRepository.save(account);
 
-        Transaction tx = transactionRepository.save(Transaction.builder()
-                .type(TransactionType.DEPOSIT)
-                .toIban(account.getIban())
-                .amount(amount)
-                .currency(account.getCurrency())
-                .timestamp(LocalDateTime.now())
-                .initiatedBy(initiator.getId())
-                .build());
+        Transaction tx = transactionRepository.save(
+                transactionMapper.toDepositEntity(request, initiator.getId(), account.getCurrency()));
 
-        return toDto(tx, initiator);
+        return transactionMapper.toResponseDto(tx, initiator);
     }
 
-    private void enforceDailyLimit(Account account, BigDecimal amount, String label) {
-        LocalDateTime startOfDay = LocalDate.now().atStartOfDay();
-        BigDecimal usedToday = transactionRepository.sumDailyMovementsSince(account.getIban(), startOfDay);
-        if (usedToday.add(amount).compareTo(account.getDailyTransferLimit()) > 0) {
-            throw new BusinessRuleException(label + " exceeds the account's daily transfer limit");
-        }
+    private BigDecimal dailyMovements(Account account) {
+        return transactionRepository.sumDailyMovementsSince(account.getIban(), LocalDate.now().atStartOfDay());
     }
 
     private User resolveInitiator(String email) {
@@ -223,33 +170,15 @@ public class TransactionService {
                 .orElseThrow(() -> new BusinessRuleException("Initiator not found"));
     }
 
-    private TransactionResponseDTO toDto(Transaction tx, User initiator) {
-        TransactionResponseDTO dto = transactionMapper.toResponseDto(tx);
-        dto.setInitiatedByName(initiator.getFirstName() + " " + initiator.getLastName());
-        return dto;
-    }
-
-    private void requireActiveCustomerChecking(Account account, String label) {
-        if (account.getType() != AccountType.CHECKING) {
-            throw new BusinessRuleException(label + " account must be a checking account");
-        }
-        requireActiveCustomerOwned(account, label);
-    }
-
-    private void requireActiveCustomerOwned(Account account, String label) {
-        if (account.getStatus() != AccountStatus.ACTIVE) {
-            throw new BusinessRuleException(label + " account is not active");
-        }
-        if (account.getUser() == null || account.getUser().getRole() != Role.CUSTOMER) {
-            throw new BusinessRuleException(label + " account must belong to a customer");
-        }
-    }
-
-    private Page<TransactionResponseDTO> mapWithNames(Page<Transaction> page) {
+    private Page<TransactionResponseDTO> mapWithInitiatorNames(Page<Transaction> page) {
         Set<Long> userIds = page.stream()
                 .map(Transaction::getInitiatedBy)
                 .filter(Objects::nonNull)
                 .collect(Collectors.toSet());
+
+        if (userIds.isEmpty()) {
+            return page.map(transactionMapper::toResponseDto);
+        }
 
         Map<Long, String> names = userRepository.findAllById(userIds).stream()
                 .collect(Collectors.toMap(User::getId, u -> u.getFirstName() + " " + u.getLastName()));
