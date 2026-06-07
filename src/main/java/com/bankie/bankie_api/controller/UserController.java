@@ -1,6 +1,7 @@
 package com.bankie.bankie_api.controller;
 
 import com.bankie.bankie_api.dto.PageResponse;
+import com.bankie.bankie_api.dto.request.UpdateProfileRequestDTO;
 import com.bankie.bankie_api.dto.request.UserFilterDTO;
 import com.bankie.bankie_api.dto.response.UserResponseDTO;
 import com.bankie.bankie_api.service.UserService;
@@ -8,15 +9,14 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
 import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/users")
@@ -42,5 +42,27 @@ public class UserController {
             @ParameterObject UserFilterDTO filter,
             @ParameterObject Pageable pageable) {
         return ResponseEntity.ok(PageResponse.from(userService.findAll(status, filter, pageable)));
+    }
+
+    @GetMapping("/me")
+    @Operation(summary = "Get own profile", description = "Returns the profile of the authenticated user. Available to any authenticated user.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Profile of the authenticated user."),
+            @ApiResponse(responseCode = "401", description = "Missing or invalid JWT token.")
+    })
+    public ResponseEntity<UserResponseDTO> myProfile(@AuthenticationPrincipal String email) {
+        return ResponseEntity.ok(userService.getProfile(email));
+    }
+
+    @PatchMapping("/me")
+    @Operation(summary = "Update own profile", description = "Updates the profile of the authenticated user. Available to any authenticated user.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Updated profile of the authenticated user."),
+            @ApiResponse(responseCode = "400", description = "Invalid request body."),
+            @ApiResponse(responseCode = "401", description = "Missing or invalid JWT token.")
+    })
+    public ResponseEntity<UserResponseDTO> updateMyProfile(@AuthenticationPrincipal String email,
+                                                           @Valid @RequestBody UpdateProfileRequestDTO dto) {
+        return ResponseEntity.ok(userService.updateProfile(email, dto));
     }
 }

@@ -38,7 +38,6 @@ public class AccountController {
 
     private final AccountService accountService;
 
-
     @GetMapping
     public ResponseEntity<Page<AccountResponseDTO>> getAccounts(
             @RequestParam(required = false) Long customerId,
