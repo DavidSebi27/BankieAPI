@@ -25,6 +25,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -39,9 +40,10 @@ public class AccountController {
 
     @GetMapping
     public ResponseEntity<Page<AccountResponseDTO>> getAccounts(
+            @RequestParam(required = false) Long customerId,
             @PageableDefault(size = 20, sort = "iban") Pageable pageable,
             Authentication authentication) {
-        return ResponseEntity.ok(accountService.getAccountsForUser(AuthContext.from(authentication), pageable));
+        return ResponseEntity.ok(accountService.getAccountsForUser(customerId, AuthContext.from(authentication), pageable));
     }
 
     @GetMapping("/search")
@@ -56,14 +58,6 @@ public class AccountController {
     public ResponseEntity<SearchAccountResponseDTO> verifyRecipient(
             @Valid @ParameterObject VerifyRecipientRequestDTO request) {
         return ResponseEntity.ok(accountService.verifyRecipient(request));
-    }
-
-    @GetMapping("/customers/{customerId}/accounts")
-    @PreAuthorize("hasRole('EMPLOYEE')")
-    public ResponseEntity<Page<AccountResponseDTO>> getAccountsByCustomer(
-            @PathVariable Long customerId,
-            @PageableDefault(size = 20) Pageable pageable) {
-        return ResponseEntity.ok(accountService.getAccountsByCustomer(customerId, pageable));
     }
 
     @PostMapping("/customers/{customerId}/approve")

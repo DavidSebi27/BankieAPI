@@ -47,7 +47,16 @@ public class AccountService {
     @Value("${bankie.account.default-daily-limit}")
     private BigDecimal defaultDailyLimit;
 
-    public Page<AccountResponseDTO> getAccountsForUser(AuthContext authContext, Pageable pageable) {
+    // customerId = null  → customer sees own accounts, employee sees all
+    // customerId = 123   → employee sees that specific customer's accounts
+    public Page<AccountResponseDTO> getAccountsForUser(Long customerId, AuthContext authContext, Pageable pageable) {
+        if (customerId != null) {
+            User user = userRepository.findById(customerId)
+                    .orElseThrow(() -> new CustomerNotFoundException(customerId));
+            return accountRepository.findByUserId(user.getId(), pageable)
+                    .map(accountMapper::toResponseDto);
+        }
+
         Page<Account> accounts = authContext.isEmployee()
                 ? accountRepository.findAll(pageable)
                 : accountRepository.findByUserId(currentUserId(authContext.email()), pageable);
@@ -80,22 +89,6 @@ public class AccountService {
         return accountMapper.toSearchResponseDto(account);
     }
 
-    public Page<UserResponseDTO> getCustomersWithoutAccounts(Pageable pageable) {
-        return userRepository.findByRoleAndNoAccounts(Role.CUSTOMER, pageable)
-                .map(userMapper::toResponseDto);
-    }
-
-    public Page<UserResponseDTO> getCustomersWithAllAccountsClosed(Pageable pageable) {
-        return userRepository.findByRoleAndAllAccountsClosed(Role.CUSTOMER, pageable)
-                .map(userMapper::toResponseDto);
-    }
-
-    public Page<AccountResponseDTO> getAccountsByCustomer(Long customerId, Pageable pageable) {
-        User user = userRepository.findById(customerId)
-                .orElseThrow(() -> new CustomerNotFoundException(customerId));
-        return accountRepository.findByUserId(user.getId(), pageable)
-                .map(accountMapper::toResponseDto);
-    }
 
     @Transactional
     public List<AccountResponseDTO> approveCustomerAndCreateAccounts(Long customerId, CreateAccountRequestDTO dto) {
