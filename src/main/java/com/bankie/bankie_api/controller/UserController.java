@@ -43,14 +43,26 @@ public class UserController {
             @ParameterObject Pageable pageable) {
         return ResponseEntity.ok(PageResponse.from(userService.findAll(status, filter, pageable)));
     }
+
     @GetMapping("/me")
-    public UserResponseDTO myProfile(@AuthenticationPrincipal String email) {
-        return userService.getProfile(email);
+    @Operation(summary = "Get own profile", description = "Returns the profile of the authenticated user. Available to any authenticated user.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Profile of the authenticated user."),
+            @ApiResponse(responseCode = "401", description = "Missing or invalid JWT token.")
+    })
+    public ResponseEntity<UserResponseDTO> myProfile(@AuthenticationPrincipal String email) {
+        return ResponseEntity.ok(userService.getProfile(email));
     }
 
     @PatchMapping("/me")
-    public UserResponseDTO updateMyProfile(@AuthenticationPrincipal String email,
-                                           @Valid @RequestBody UpdateProfileRequestDTO dto) {
-        return userService.updateProfile(email, dto);
+    @Operation(summary = "Update own profile", description = "Updates the profile of the authenticated user. Available to any authenticated user.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Updated profile of the authenticated user."),
+            @ApiResponse(responseCode = "400", description = "Invalid request body."),
+            @ApiResponse(responseCode = "401", description = "Missing or invalid JWT token.")
+    })
+    public ResponseEntity<UserResponseDTO> updateMyProfile(@AuthenticationPrincipal String email,
+                                                           @Valid @RequestBody UpdateProfileRequestDTO dto) {
+        return ResponseEntity.ok(userService.updateProfile(email, dto));
     }
 }
