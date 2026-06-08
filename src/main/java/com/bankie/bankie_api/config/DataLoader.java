@@ -78,6 +78,19 @@ public class DataLoader implements CommandLineRunner {
         addTx(TransactionType.TRANSFER, keanuIban, taylorIban, "100.00", 0, keanu.getId(), 5);
         addTx(TransactionType.TRANSFER, ryanIban, taylorIban, "45.00", 0, ryan.getId(), 2);
         addTx(TransactionType.WITHDRAWAL, taylorIban, null, "100.00", 0, taylor.getId(), 1);
+
+        // Bulk transfers so pagination (>20 rows) is demonstrable in the UI.
+        // initiatedBy matches the source account owner to stay consistent with authorization.
+        Object[][] transfers = {
+                {ryanIban, taylorIban, ryan.getId()}, {taylorIban, ryanIban, taylor.getId()},
+                {ryanIban, keanuIban, ryan.getId()}, {keanuIban, ryanIban, keanu.getId()},
+                {taylorIban, keanuIban, taylor.getId()}, {keanuIban, taylorIban, keanu.getId()},
+        };
+        for (int i = 0; i < 30; i++) {
+            Object[] t = transfers[i % transfers.length];
+            String amount = new BigDecimal("10.00").add(new BigDecimal(i * 7 + 1)).toString();
+            addTx(TransactionType.TRANSFER, (String) t[0], (String) t[1], amount, i % 6, (Long) t[2], i % 12);
+        }
     }
 
     private void addTx(TransactionType type, String from, String to, String amt, int daysAgo, Long by) {
